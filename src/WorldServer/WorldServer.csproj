@@ -87,11 +87,14 @@
     <Compile Include="Player\ShamalaTransformation.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Scripting\Base\BaseScript.Missions.cs" />
     <Compile Include="Scripting\Misc\AIScript.cs" />
     <Compile Include="Scripting\Base\BaseScript.cs" />
     <Compile Include="Scripting\Base\BaseScript.Props.cs" />
     <Compile Include="Scripting\Base\BaseScript.Quests.cs" />
     <Compile Include="Scripting\Misc\CreatureScript.cs" />
+    <Compile Include="Scripting\Mission\MissionScript.cs" />
+    <Compile Include="Scripting\Mission\ShadowMissionScript.cs" />
     <Compile Include="Scripting\NPC\DialogElements.cs" />
     <Compile Include="Scripting\Misc\ItemScript.cs" />
     <Compile Include="Scripting\Quest\QuestScript.Prerequisites.cs" />

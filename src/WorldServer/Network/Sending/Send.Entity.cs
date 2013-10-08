@@ -67,8 +67,15 @@ namespace Aura.World.Network
 				packet.PutString(prop.State);
 				packet.PutLong(0);
 
-				packet.PutByte(true); // Extra data?
-				packet.PutString(prop.ExtraData);
+                /*
+                packet.PutByte(true); // Extra data?
+                packet.PutString(prop.ExtraData);
+                */
+
+                bool extra;
+                packet.PutByte(extra = prop.UseExtraData);
+                if (extra)
+                    packet.PutString(prop.ExtraData);
 
 				packet.PutInt(0);
 				packet.PutShort(0);
@@ -92,8 +99,17 @@ namespace Aura.World.Network
 			{
 				packet.PutString(prop.State);
 				packet.PutLong(DateTime.Now);
-				packet.PutByte(true);
-				packet.PutString(prop.ExtraData);
+
+                /*
+                packet.PutByte(true); // Extra data?
+                packet.PutString(prop.ExtraData);
+                */
+
+                bool extra;
+                packet.PutByte(extra = prop.UseExtraData);
+                if (extra)
+                    packet.PutString(prop.ExtraData);
+
 				packet.PutFloat(prop.Info.Direction);
 				packet.PutShort(0);
 			}

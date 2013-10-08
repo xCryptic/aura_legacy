@@ -32,9 +32,10 @@ namespace Aura.World.World
 		public uint Color8;
 		public uint Color9;
 		public byte FixedAltitude;
-		private byte __unknown65;
-		private byte __unknown66;
-		private byte __unknown67;
+        // Will want to access these, to public
+        public byte __unknown65;
+        public byte __unknown66;
+        public byte __unknown67;
 	}
 
 	public class MabiProp : MabiEntity
@@ -51,6 +52,7 @@ namespace Aura.World.World
 		/// </summary>
 		public string State { get; set; }
 		public string ExtraData { get; set; }
+        public bool UseExtraData { get; set; } // Added w/ mission stuff
 
 		public override EntityType EntityType
 		{
@@ -100,6 +102,9 @@ namespace Aura.World.World
 			this.Name = name;
 			this.Title = title;
 			this.ExtraData = extra;
+
+            // If something in extra, use it
+            this.UseExtraData = (extra != null && extra.Length > 0);
 
 			this.Info.Class = cls;
 			this.Info.Region = region;
