@@ -418,6 +418,18 @@ namespace Aura.Shared.Network
 		public const uint Walking = 0x0FD13021;
 		public const uint Walk = 0x0FF23431;
 
+        public readonly static uint ShadowMissionMap = 0x8D6B;
+        public readonly static uint ShadowMissionMapR = 0x8D6C;
+        //public readonly static uint PartyQuestSomethingR = 0x8EB1; // Sent to client
+        //public readonly static uint PartyQuestSomethingR = 0x8EB4; // Sent to client
+        public readonly static uint ShadowMissionList = 0x8EBF;
+        public readonly static uint ShadowMissionListR = 0x8EC0;
+        public readonly static uint ShadowMissionAccept = 0x8EC3;
+        public readonly static uint ShadowMissionAcceptR = 0x8EC4;
+        public readonly static uint ShadowMissionExit = 0xA90D;
+        public readonly static uint ShadowMissionExitR = 0xA90E;
+        public readonly static uint ShadowMissionRegionR = 0xA97E;
+
 		// Messenger Server
 		// ------------------------------------------------------------------
 		public static class Msgr

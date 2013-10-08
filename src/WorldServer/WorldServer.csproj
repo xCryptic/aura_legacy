@@ -63,6 +63,7 @@
     <Compile Include="Events\EventArgs.cs" />
     <Compile Include="Events\EventManager.cs" />
     <Compile Include="Network\PacketCreator.cs" />
+    <Compile Include="Network\Sending\Send.Mission.cs" />
     <Compile Include="Network\Sending\Send.PvP.cs" />
     <Compile Include="Network\Sending\Send.Entity.cs" />
     <Compile Include="Network\Sending\Send.Quest.cs" />
@@ -150,6 +151,7 @@
     <Compile Include="World\MabiItem.cs" />
     <Compile Include="Skills\CombatHelper.cs" />
     <Compile Include="World\MabiMail.cs" />
+    <Compile Include="World\MabiMission.cs" />
     <Compile Include="World\MabiNPC.cs" />
     <Compile Include="World\MabiParty.cs" />
     <Compile Include="World\MabiProp.cs" />
@@ -159,6 +161,7 @@
     <Compile Include="World\MabiSkill.cs" />
     <Compile Include="World\MabiStatMod.cs" />
     <Compile Include="World\MabiVertex.cs" />
+    <Compile Include="World\MissionManager.cs" />
     <Compile Include="World\Quadtree.cs" />
     <Compile Include="World\WeatherManager.cs" />
     <Compile Include="World\WorldManager.cs" />

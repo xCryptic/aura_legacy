@@ -17,6 +17,30 @@ namespace Aura.Data
 
 		public OrderedDictionary Objectives = new OrderedDictionary();
 		public List<QuestRewardInfo> Rewards = new List<QuestRewardInfo>();
+
+        public byte Type = 2;
+
+        public uint Unknown1 = 70024; // 70501 const for missions?
+        public byte Unknown2 = 0; // 1 for blue icon
+        public String Unknown3 = ""; // <xml soundset="4" npc="GUI_NPCportrait_Lanier"/>
+
+        // These apply only to SMs it seems
+        public byte PartyCountMin = 0, PartyCountMax = 0;
+        public uint TimeLimit = 0; // Milliseconds
+        public String TooltipDescription = "";
+
+        public String GetRewardsString()
+        {
+            String s = "";
+            bool first = true;
+            foreach (QuestRewardInfo r in this.Rewards)
+            {
+                if (!first) s += '\x0A'; // Newline
+                s += String.Format("* {0}", r.ToString());
+                first = false;
+            }
+            return s;
+        }
 	}
 
 	public class QuestObjectiveInfo

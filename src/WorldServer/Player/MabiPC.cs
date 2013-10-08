@@ -106,5 +106,54 @@ namespace Aura.World.Player
 		{
 			return this.Quests.Values.FirstOrDefault(a => a.Id == id);
 		}
+
+        /// <summary>
+        /// Get all quests whose class Id lies within a certain range.
+        /// Range is [inclusive, exclusive)
+        /// </summary>
+        /// <param name="clsStart">Range start</param>
+        /// <param name="clsEnd">Range end</param>
+        /// <param name="maxCount">Max number of quests to find</param>
+        /// <returns></returns>
+        public MabiQuest[] GetQuests(uint clsStart, uint clsEnd, uint maxCount = 0)
+        {
+            uint start = 0, end = 0;
+
+            if (clsStart == clsEnd)
+            {
+                var quest = this.GetQuestOrNull(clsStart);
+                if (quest == null) return new MabiQuest[0];
+                else return new MabiQuest[] { quest };
+            }
+            else if (clsStart < clsEnd) { start = clsStart; end = clsEnd; }
+            else { start = clsEnd; end = clsStart; }
+
+            var quests = new List<MabiQuest>();
+
+            // Might be a more efficient way, like get iterator starting at clsStart
+            foreach (var kvp in this.Quests)
+            {
+                // No longer interested
+                if (kvp.Key >= end) break;
+
+                else if (kvp.Key >= start && kvp.Value != null)
+                {
+                    quests.Add(kvp.Value);
+
+                    // Check if we hit max
+                    if (maxCount > 0 && maxCount <= quests.Count)
+                        break;
+                }
+            }
+
+            return quests.ToArray();
+        }
+
+        public MabiQuest GetShadowMissionQuestOrNull()
+        {
+            var quests = this.GetQuests(700000, 702000, 1); // Make this class range flexible?
+            if (quests.Length == 0) return null;
+            else return quests[0];
+        }
 	}
 }

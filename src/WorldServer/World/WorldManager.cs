@@ -1387,6 +1387,11 @@ namespace Aura.World.World
 				}
 			}
 		}
+
+        public List<MabiProp> GetPropsInRegion(uint regionId)
+        {
+            return _props.FindAll(a => a.Region == regionId);
+        }
 	}
 
 	public enum SendTargets : byte { All = 1, Region = 2, Range = 4, Party = 8, Guild = 16, ExcludeSender = 32 }

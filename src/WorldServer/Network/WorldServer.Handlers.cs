@@ -155,6 +155,11 @@ namespace Aura.World.Network
 			this.RegisterPacketHandler(Op.Internal.ServerIdentify, HandleServerIdentify);
 			this.RegisterPacketHandler(Op.ChannelStatus, HandleChannelStatus);
 
+            this.RegisterPacketHandler(Op.ShadowMissionList, HandleShadowMissionList);
+            this.RegisterPacketHandler(Op.ShadowMissionMap, HandleShadowMissionMap);
+            this.RegisterPacketHandler(Op.ShadowMissionAccept, HandleShadowMissionAccept);
+            this.RegisterPacketHandler(Op.ShadowMissionExit, HandleShadowMissionExit);
+
 			// Temp/Unknown
 			// --------------------------------------------------------------
 
@@ -3357,5 +3362,129 @@ namespace Aura.World.Network
 
 			client.Send(response);
 		}
+
+        private void HandleShadowMissionList(WorldClient client, MabiPacket packet)
+        {
+            byte difficulty = packet.GetByte();
+            uint boardClassId = packet.GetInt(); // Class Id of SM board
+            MissionBoard board = MissionManager.Instance.GetShadowMissionBoard(boardClassId);
+
+            var response = new MabiPacket(Op.ShadowMissionListR, packet.Id);
+            board.AddToPacket(response, difficulty);
+            client.Send(response);
+        }
+
+        private void HandleShadowMissionMap(WorldClient client, MabiPacket packet)
+        {
+            String echo = packet.GetString();
+            uint classId = packet.GetInt();
+
+            var sm = MissionManager.Instance.GetShadowMissionInfo(classId);
+            if (sm == null) return; // Do nothing
+
+            MabiPacket response = new MabiPacket(Op.ShadowMissionMapR, packet.Id);
+            response.PutString(echo);
+            sm.AddMapDataToPacket(response);
+            client.Send(response);
+        }
+
+        private void HandleShadowMissionAccept(WorldClient client, MabiPacket packet)
+        {
+            var creature = client.GetCreatureOrNull(packet.Id);
+            if (creature == null)
+                return;
+
+            if (!(creature is MabiPC))
+            {
+                Send.ShadowMissionAcceptR(creature, false, "You don't exist!");
+                return;
+            }
+
+            var player = creature as MabiPC;
+
+            // Check if they already have a SM quest
+            if (player.GetShadowMissionQuestOrNull() != null)
+            {
+                // TODO: Change text to official Mabi's text later
+                Send.ShadowMissionAcceptR(creature, false, "You already have a Shadow Mission");
+                return;
+            }
+
+            uint classId = packet.GetInt();
+            byte difficulty = packet.GetByte();
+
+            // Temp check for now, if it's really a SM
+            if (classId < 700000 || classId >= 800000)
+            {
+                Send.ShadowMissionAcceptR(creature, false, "The quest requested is not a Shadow Mission");
+                return;
+            }
+
+            var sm = MissionManager.Instance.GetShadowMissionInfo(classId);
+            if (sm == null)
+            {
+                Send.ShadowMissionAcceptR(creature, false, "The Shadow Mission quest could not be found");
+                return;
+            }
+
+            // Difficulty check
+            if (!sm.SupportsDifficulty(difficulty))
+            {
+                Send.ShadowMissionAcceptR(creature, false,
+                    "Selected Shadow Mission does not support selected difficulty");
+                return;
+            }
+
+            var quest = sm.GenerateQuestOrNull(creature, difficulty);
+            if (quest == null)
+            {
+                Send.ShadowMissionAcceptR(creature, false, "Error generating quest");
+                return;
+            }
+
+            // Add the quest, should be thread safe?
+            player.Quests.Add(classId, quest);
+
+            // See BaseScript.Quests.cs for examples
+
+            Send.ShadowMissionAcceptR(creature, true);
+
+            Send.ItemInfo(player.Client, creature, quest.QuestItem);
+            Send.QuestNew(player, quest);
+            //WorldManager.Instance.CreatureReceivesQuest(creature, quest);
+
+            // Should probably be a function for this.. manual send for now
+            var questUpdate = new MabiPacket(Op.QuestUpdate, creature.Id)
+                .PutLong(quest.Id)
+                .PutByte(1) // Can quit this mission
+                .PutByte(0)
+                .PutInt(0)
+                .PutByte(0)
+                .PutByte(0);
+            client.Send(questUpdate);
+
+            // Placeholder function name:
+            // if(CanPartakeInShadowMission(creature, classId, difficulty))
+            {
+                // Right now, just accept
+                // var sm = WorldManager.Instance.GetShadowMissionInfo(classId);
+            }
+            //  else // Untested
+            //  {
+            //      
+            //  }
+        }
+
+        private void HandleShadowMissionExit(WorldClient client, MabiPacket packet)
+        {
+            //var sm = client.ShadowMission;
+
+            // New strat: check region instance Id (ex. 35,000) and try to get mission from it?
+
+            //if (sm != null) sm.Exit(client.Character as MabiPC); // Might exception
+
+            // Exit will need thread safety/locking..
+            // Otherwise Exit request spamming could cause problems
+        }
 	}
 }

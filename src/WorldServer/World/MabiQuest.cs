@@ -41,6 +41,13 @@ namespace Aura.World.World
 
 		public OrderedDictionary Progresses = new OrderedDictionary();
 
+        // Key:Type:Value set sent with QuestNew
+        public MabiTags Tags = null;
+
+        // Shadow Mission specific
+        public byte MissionDifficulty = (byte)Difficulty.Basic;
+        public bool ShowExitButton = false; // Sent as a byte in QuestNew for some reason..
+
 		/// <summary>
 		/// Every quest has an invisible item that goes with it.
 		/// The id is always quest id - 0x0010000000000000.
