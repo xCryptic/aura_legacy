@@ -424,6 +424,8 @@ namespace Aura.Shared.Network
         //public readonly static uint PartyQuestSomethingR = 0x8EB4; // Sent to client
         public readonly static uint ShadowMissionList = 0x8EBF;
         public readonly static uint ShadowMissionListR = 0x8EC0;
+        public const uint ShadowMissionUnk = 0x8EC1;
+        public const uint ShadowMissionUnkR = 0x8EC2;
         public readonly static uint ShadowMissionAccept = 0x8EC3;
         public readonly static uint ShadowMissionAcceptR = 0x8EC4;
         public readonly static uint ShadowMissionExit = 0xA90D;

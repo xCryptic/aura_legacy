@@ -214,6 +214,12 @@ namespace Aura.World.Network
 				// there are items equipped on that set.
 				// Also sent when pressing ESC?
 			});
+
+            this.RegisterPacketHandler(Op.ShadowMissionUnk, (client, packet) =>
+            {
+                // Unsure what this is for, got it while checking SM board?
+                client.Send(new MabiPacket(Op.ShadowMissionUnkR, packet.Id).PutInt(0));
+            });
 		}
 
 		private void HandleLogin(WorldClient client, MabiPacket packet)
@@ -1306,6 +1312,15 @@ namespace Aura.World.Network
 			// TODO: Maybe check if this action is valid.
 
 			Send.CharacterUnlock(client, creature);
+
+            // If waiting on mission, enter now..
+            // Really needs to be integrated better...
+            if (MissionManager.Instance.IsEnteringMission(client.Character.Id))
+            {
+                var mission = MissionManager.Instance.GetMissionOrNull(client.Character.Id);
+                if (mission != null) mission.AfterEnter(client.Character as MabiPC);
+                return;
+            }
 
 			// Sent on log in, but not when switching regions?
 			client.Send(new MabiPacket(Op.EnterRegionR, Id.World).PutByte(1).PutLongs(creature.Id).PutLong(MabiTime.Now.DateTime));
@@ -3368,6 +3383,11 @@ namespace Aura.World.Network
             byte difficulty = packet.GetByte();
             uint boardClassId = packet.GetInt(); // Class Id of SM board
             MissionBoard board = MissionManager.Instance.GetShadowMissionBoard(boardClassId);
+            if (board == null)
+            {
+                // TODO: Send response with error byte?
+                return;
+            }
 
             var response = new MabiPacket(Op.ShadowMissionListR, packet.Id);
             board.AddToPacket(response, difficulty);
@@ -3396,7 +3416,7 @@ namespace Aura.World.Network
 
             if (!(creature is MabiPC))
             {
-                Send.ShadowMissionAcceptR(creature, false, "You don't exist!");
+                Send.MissionAcceptR(creature, false, "You don't exist!");
                 return;
             }
 
@@ -3406,7 +3426,7 @@ namespace Aura.World.Network
             if (player.GetShadowMissionQuestOrNull() != null)
             {
                 // TODO: Change text to official Mabi's text later
-                Send.ShadowMissionAcceptR(creature, false, "You already have a Shadow Mission");
+                Send.MissionAcceptR(creature, false, "You already have a Shadow Mission");
                 return;
             }
 
@@ -3416,29 +3436,31 @@ namespace Aura.World.Network
             // Temp check for now, if it's really a SM
             if (classId < 700000 || classId >= 800000)
             {
-                Send.ShadowMissionAcceptR(creature, false, "The quest requested is not a Shadow Mission");
+                Send.MissionAcceptR(creature, false, "The quest requested is not a Shadow Mission");
                 return;
             }
 
             var sm = MissionManager.Instance.GetShadowMissionInfo(classId);
             if (sm == null)
             {
-                Send.ShadowMissionAcceptR(creature, false, "The Shadow Mission quest could not be found");
+                Send.MissionAcceptR(creature, false, "The Shadow Mission quest could not be found");
                 return;
             }
 
             // Difficulty check
             if (!sm.SupportsDifficulty(difficulty))
             {
-                Send.ShadowMissionAcceptR(creature, false,
+                Send.MissionAcceptR(creature, false,
                     "Selected Shadow Mission does not support selected difficulty");
                 return;
             }
 
+            // Generate quest for user
             var quest = sm.GenerateQuestOrNull(creature, difficulty);
             if (quest == null)
             {
-                Send.ShadowMissionAcceptR(creature, false, "Error generating quest");
+                // Throw exception?
+                Send.MissionAcceptR(creature, false, "Error generating quest");
                 return;
             }
 
@@ -3447,7 +3469,7 @@ namespace Aura.World.Network
 
             // See BaseScript.Quests.cs for examples
 
-            Send.ShadowMissionAcceptR(creature, true);
+            Send.MissionAcceptR(creature, true);
 
             Send.ItemInfo(player.Client, creature, quest.QuestItem);
             Send.QuestNew(player, quest);
@@ -3478,10 +3500,12 @@ namespace Aura.World.Network
         private void HandleShadowMissionExit(WorldClient client, MabiPacket packet)
         {
             //var sm = client.ShadowMission;
+            var player = client.Character as MabiPC;
+            var sm = MissionManager.Instance.GetMissionOrNull(player);
 
             // New strat: check region instance Id (ex. 35,000) and try to get mission from it?
 
-            //if (sm != null) sm.Exit(client.Character as MabiPC); // Might exception
+            if (sm != null) sm.Exit(player); // Might exception
 
             // Exit will need thread safety/locking..
             // Otherwise Exit request spamming could cause problems

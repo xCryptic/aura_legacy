@@ -68,6 +68,7 @@ namespace Aura.World.Network
             // First argument is a String which echos the String sent in request, so
             // no need to handle that here
 
+            // Map crop: X1, X2, Y1, Y2
             packet.PutInt(info.MapRegion);
             for (int i = 0; i < 4; i++)
             {
@@ -76,15 +77,15 @@ namespace Aura.World.Network
                 else packet.PutShort(0);
             }
 
+            // Add /!\ coords
             packet.PutInt((uint)info.MapMarkCoords.Count);
             foreach (Tuple<uint, uint> coords in info.MapMarkCoords)
             {
-                packet.PutInt(coords.Item1);
-                packet.PutInt(coords.Item2);
+                packet.PutInt(coords.Item1).PutInt(coords.Item2);
             }
         }
 
-        public static void ShadowMissionAcceptR(MabiCreature creature, bool success, string msg = null)
+        public static void MissionAcceptR(MabiCreature creature, bool success, string msg = null)
         {
             var packet = new MabiPacket(Op.ShadowMissionAcceptR, creature.Id); // Might not use creature.Id, assumption
             packet.PutByte(success);
@@ -92,6 +93,5 @@ namespace Aura.World.Network
                 packet.PutString(msg);
             creature.Client.Send(packet);
         }
-
     }
 }

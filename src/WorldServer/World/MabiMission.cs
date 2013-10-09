@@ -15,8 +15,6 @@ using Aura.World.Player;
 
 namespace Aura.World.World
 {
-
-
     // [#SM]
     public class MissionBoard
     {
@@ -120,9 +118,10 @@ namespace Aura.World.World
         }
     } 
     ***/
-
-
-    // These will need to be "hardcoded" in some way, probably text db files (or script?)
+    
+    /// <summary>
+    /// Contains info (metadata) on a mission. (Move to Aura.Data eventually?)
+    /// </summary>
     public class MissionInfo
     {
         /// <summary>
@@ -131,7 +130,8 @@ namespace Aura.World.World
         public QuestInfo QuestInfo = new QuestInfo();
 
         /// <summary>
-        /// Function called when starting the mission.
+        /// Function called when starting the mission. Usually set by
+        /// script function HookMissionStart()
         /// </summary>
         public MabiMission.Callback OnMissionStart = null;
 
@@ -142,7 +142,7 @@ namespace Aura.World.World
         // need four identical shadow missions with just different
         // difficulty, for now just set a max
         //public byte MaxDifficulty = (byte)Difficulty.Elite;
-        public List<byte> Difficulties = new List<byte>();
+        public List<byte> Difficulties = new List<byte>(); // Could also be a flag..? Technically 256 possible difficulties
 
         // Arg 3
         //public String Name = "";
@@ -204,9 +204,9 @@ namespace Aura.World.World
         public SortedDictionary<byte, List<QuestRewardInfo>> Rewards = new SortedDictionary<byte, List<QuestRewardInfo>>();
 
         /// <summary>
-        /// Regions involved in this Shadow Mission.
+        /// Info on regions involved in this Shadow Mission.
         /// </summary>
-        public List<Region> Regions = new List<Region>();
+        public List<MissionRegionInfo> Regions = new List<MissionRegionInfo>();
 
         // Data sent in 0x8D6C (map data)
 
@@ -235,10 +235,10 @@ namespace Aura.World.World
             = new Dictionary<uint, Tuple<uint, uint>>();
 
         /// <summary>
-        /// List of alter prop Ids which this Mission can be launched from, if any.
+        /// List of prop Ids which this Mission can be launched from, if any.
         /// Included to restrict starting the mission from anywhere?
         /// </summary>
-        public List<ulong> Altars = new List<ulong>();
+        public List<ulong> Triggers = new List<ulong>();
 
         // Implement this better
         public uint ExitRegion = 0, ExitSpawnX = 0, ExitSpawnY = 0;
@@ -279,12 +279,12 @@ namespace Aura.World.World
         }
 
         /// <summary>
-        /// Add a supported altar prop.
+        /// Add a supported trigger.
         /// </summary>
-        /// <param name="propId">Prop Id of altar</param>
-        public void AddAltar(ulong propId)
+        /// <param name="propId">Prop Id of trigger</param>
+        public void AddTrigger(ulong propId)
         {
-            this.Altars.Add(propId);
+            this.Triggers.Add(propId);
         }
 
         public void AddMapMarking(uint x, uint y)
@@ -320,7 +320,7 @@ namespace Aura.World.World
             // Just QuestInfo's rewards
             this.QuestInfo.Rewards = rewards;
 
-            packet.PutInt(this.Class);
+            packet.PutInt(this.Class); // Quest class Id
             packet.PutByte(difficulty);
             packet.PutString(this.Name);
             packet.PutByte(this.PartyCountMin);
@@ -359,9 +359,9 @@ namespace Aura.World.World
             }
         }
 
-        public MissionInfo.Region AddRegion(uint mapId)
+        public MissionRegionInfo AddRegion(uint mapId)
         {
-            var region = new MissionInfo.Region();
+            var region = new MissionRegionInfo();
             region.Id = mapId;
             this.Regions.Add(region);
             return region;
@@ -383,6 +383,9 @@ namespace Aura.World.World
             // Older class before I found Tags:
             //quest.QMValues = this.GetQMValues((Difficulty)difficulty);
 
+            quest.ShowExitButton = true;
+            quest.Info.Unknown2 = 1;
+            quest.Info.Type = 7;
 
             return quest;
         }
@@ -538,13 +541,13 @@ namespace Aura.World.World
 
         /// <summary>
         /// Whether or not this Shadow Mission can be started from
-        /// a certain altar.
+        /// a certain prop.
         /// </summary>
-        /// <param name="propId">Prop Id of altar</param>
-        /// <returns></returns>
-        public bool SupportsAltar(ulong propId)
+        /// <param name="propId">Prop Id</param>
+        /// <returns>true if prop supported, false if not</returns>
+        public bool SupportsProp(ulong propId)
         {
-            return this.Altars.Contains(propId);
+            return this.Triggers.Contains(propId);
         }
 
         public bool SupportsDifficulty(Difficulty d)
@@ -556,39 +559,75 @@ namespace Aura.World.World
         {
             return (this.Difficulties.Contains(d));
         }
+    }
+
+    /// <summary>
+    /// Class to store information on a region in a mission.
+    /// </summary>
+    public class MissionRegionInfo
+    {
+        public uint Id = 0; // Map Id, 300 = Tail, etc
+        public string VariationFile = "";
+        public string DirectoryName = "";
+
+        public uint Unknown1 = 0;
+        public byte Unknown2 = 0;
 
         /// <summary>
-        /// Class to store information on a region in a mission.
+        /// Unknown flag, usually 0x80000001, seen as 0x80000003 in a theatre mission.
         /// </summary>
-        public class Region
+        public uint UnknownFlag = 0x80000001;
+
+        /// <summary>
+        /// Get the path of the default variation file.
+        /// </summary>
+        /// <returns>Path of the default variation file</returns>
+        public string GetDefaultVariationFile()
         {
-            public uint Id = 0; // Map Id, 300 = Tail, etc
-            public string VariationFile = "";
-            public string DirectoryName = "";
-
-            public uint Unknown1 = 0;
-            public byte Unknown2 = 0;
-
-            /// <summary>
-            /// Unknown flag, usually 0x80000001, seen as 0x80000003 in a theatre mission.
-            /// </summary>
-            public uint UnknownFlag = 0x80000001;
-
-            /// <summary>
-            /// Get the path of the default variation file.
-            /// </summary>
-            /// <returns>Path of the default variation file</returns>
-            public string GetDefaultVariationFile()
-            {
-                if (this.DirectoryName == null || this.DirectoryName.Equals(""))
-                    return "";
-                return String.Format("data/world/{0}/region_variation_1.xml", this.DirectoryName);
-            }
+            if (this.DirectoryName == null || this.DirectoryName.Equals(""))
+                return "";
+            return String.Format("data/world/{0}/region_variation_1.xml", this.DirectoryName);
         }
     }
 
-    public class MabiSubworld
+    // This is the actual Shadow Mission instance
+
+    /// <summary>
+    /// Mission instance, used for instances of shadow / theatre missions.
+    /// </summary>
+    public class MabiMission : IDisposable
     {
+        public delegate void Callback(MabiMission mission);
+
+        public MissionInfo MissionInfo = null;
+        //public uint RegionId = 0; // Of region instance
+        public bool Completed = false;
+
+        // Map player Ids to indices
+        private Dictionary<ulong, uint> _playerIndices = new Dictionary<ulong, uint>();
+        private Object _indicesLock = new Object();
+
+        /// <summary>
+        /// All region instances associated with this Shadow Mission.
+        /// Make some RegionContainer parent class later (Dungeons will have Regions too)
+        /// </summary>
+        //public Dictionary<uint, Region> Regions = new Dictionary<uint, Region>();
+        public MissionRegion[] Regions = new MissionRegion[0];
+
+        private uint _startingRegionId = 0;
+
+        private byte _difficulty = (byte)(Difficulty.Basic);
+
+        /// <summary>
+        /// The prop Id that triggered this mission instance, or 0 if none.
+        /// </summary>
+        private ulong _propId = 0;
+
+        /// <summary>
+        /// Things to dispose of upon disposing of the mission instance.
+        /// </summary>
+        private List<IDisposable> _disposables = new List<IDisposable>();
+
         // Only includes players, one per client, no pets
         protected SortedDictionary<ulong, MabiCreature> _players = new SortedDictionary<ulong, MabiCreature>();
         protected Object _playersLock = new Object();
@@ -625,52 +664,20 @@ namespace Aura.World.World
             }
             return r;
         }
-    }
-
-    // This is the actual Shadow Mission instance
-    public class MabiMission : MabiSubworld, IDisposable
-    {
-        public delegate void Callback(MabiMission mission);
-
-        public MissionInfo MissionInfo = null;
-        //public uint RegionId = 0; // Of region instance
-        public bool Completed = false;
-
-        // Map player Ids to indices
-        private Dictionary<ulong, uint> _playerIndices = new Dictionary<ulong, uint>();
-        private Object _indicesLock = new Object();
-
-        /// <summary>
-        /// All region instances associated with this Shadow Mission.
-        /// Make some RegionContainer parent class later (Dungeons will have Regions too)
-        /// </summary>
-        //public Dictionary<uint, Region> Regions = new Dictionary<uint, Region>();
-        public Region[] Regions = new Region[0];
-
-        private uint _startingRegionId = 0;
-
-        private byte _difficulty = (byte)(Difficulty.Basic);
-
-        /// <summary>
-        /// The prop Id that triggered this mission instance, or 0 if none.
-        /// </summary>
-        private ulong _propId = 0;
-
-        /// <summary>
-        /// Things to dispose of upon disposing of the mission instance.
-        /// </summary>
-        private List<IDisposable> _disposables = new List<IDisposable>();
 
         /// <summary>
         /// Get the starting region instance that players spawn in when entering the mission.
         /// </summary>
-        public Region StartingRegion
+        public MissionRegion StartingRegion
         {
             get
             {
                 return this.Regions[0];
             }
         }
+
+        private SortedDictionary<ulong, MissionStatus> _statuses
+            = new SortedDictionary<ulong, MissionStatus>();
 
         public MabiMission(uint regionId, MissionInfo info, Difficulty difficulty, ulong propId = 0)
             : this(new uint[] { regionId }, info, (byte)difficulty, propId)
@@ -740,6 +747,29 @@ namespace Aura.World.World
             }
         }
 
+        public void SetPlayerStatus(ulong playerId, MissionStatus status)
+        {
+            lock (_statuses)
+            {
+                if (_statuses.ContainsKey(playerId))
+                    _statuses[playerId] = status;
+                else _statuses.Add(playerId, status);
+            }
+        }
+
+        public MissionStatus GetPlayerStatus(MabiPC player)
+        {
+            return this.GetPlayerStatus(player.Id);
+        }
+
+        public MissionStatus GetPlayerStatus(ulong playerId)
+        {
+            MissionStatus status = MissionStatus.None;
+            lock (_statuses)
+                _statuses.TryGetValue(playerId, out status);
+            return status;
+        }
+
         public virtual void Dispose()
         {
             lock (_disposables)
@@ -755,12 +785,12 @@ namespace Aura.World.World
         /// <param name="regionIds">Map of region indices (as in ShadowMissionInfo) to region Ids</param>
         private void InitRegions(uint[] regionIds)
         {
-            this.Regions = new Region[regionIds.Length];
+            this.Regions = new MissionRegion[regionIds.Length];
 
             uint count = 0;
             foreach (var region in this.MissionInfo.Regions)
             {
-                this.Regions[count] = new Region(regionIds[count], region);
+                this.Regions[count] = new MissionRegion(regionIds[count], region);
                 count++;
             }
         }
@@ -927,10 +957,10 @@ namespace Aura.World.World
             // Add player to indices dictionary, will use for now as "proof" that they
             // are a part of this SM..
             this.AddPlayerIndex(player.Id, playerIndex);
-
-            // [#TEMPORARY]
+            
             //client.ShadowMission = this;
             //client.ShadowMissionStatus = ShadowMissionStatus.Entering;
+            MissionManager.Instance.AddPlayerToMission(player.Id, this);
 
             // This should be it, after server receives a "EnterRegion" from client,
             // it unlocks character, then spawns entities and props, and "reassigns"
@@ -938,11 +968,13 @@ namespace Aura.World.World
             // Upon getting "EnterRegion" from client, should set MabiCreature's 
             // Shadow Mission field.
             // See AfterEnter()
+
+            this.SetPlayerStatus(player.Id, MissionStatus.Entering);
         }
 
         /// <summary>
         /// Called after a creature was sent data from Enter(), sends them additional data
-        /// and unlocks them.
+        /// and unlocks them. Specifically called after EnterRegion request received.
         /// </summary>
         /// <param name="creature"></param>
         public void AfterEnter(MabiPC player)
@@ -964,7 +996,7 @@ namespace Aura.World.World
 
             //client.SendUnlock(player);
 
-            // TODO: Send a EntitiesSpawn
+            // TODO: Send a EntitiesAppear
             // Send entities in range, copied from EnterRegion handler for now
             // This also sends props, usually.. ? Doesn't yet
             var entities = WorldManager.Instance.GetEntitiesInRange(player);
@@ -977,8 +1009,8 @@ namespace Aura.World.World
 
             // Send all PropAppears (props)
             // Send a QuestNew for SM quest, will have new Id
-            var quest = new MabiQuest(this.MissionInfo.Class);
-            quest.ShowExitButton = true;
+            //var quest = new MabiQuest(this.MissionInfo.Class);
+            var quest = this.MissionInfo.GenerateQuestOrNull(player, _difficulty);
             player.Quests[quest.Class] = quest;
 
             Send.QuestNew(player, quest);
@@ -1032,10 +1064,8 @@ namespace Aura.World.World
 
             // Client also sends a 0xA90B request around now, server responds
             // with 0xA90C, seems to contain data/positions of next wave of monsters?
-
-
-            // [#TEMPORARY]
-            //client.ShadowMissionStatus = ShadowMissionStatus.In;
+            
+            this.SetPlayerStatus(player.Id, MissionStatus.In);
         }
 
         public void Exit(MabiPC player)
@@ -1054,6 +1084,7 @@ namespace Aura.World.World
             // [#TEMPORARY]
             //client.ClearShadowMission();
             //client.ShadowMissionStatus = ShadowMissionStatus.None;
+            MissionManager.Instance.RemovePlayerFromMission(player.Id);
 
             // Remove SM quest
             var quest = player.GetShadowMissionQuestOrNull();
@@ -1090,24 +1121,26 @@ namespace Aura.World.World
             return props;
         }
 
-        /// <summary>
-        /// Instance of a region
-        /// </summary>
-        public class Region
+        
+    }
+
+    /// <summary>
+    /// Instance of a region
+    /// </summary>
+    public class MissionRegion
+    {
+        public uint Id = 0; // Id from pool
+        public MissionRegionInfo Data = null;
+
+        public MissionRegion(uint regionId, MissionRegionInfo data)
         {
-            public uint Id = 0; // Id from pool
-            public MissionInfo.Region Data = null;
+            this.Id = regionId;
+            this.Data = data;
+        }
 
-            public Region(uint regionId, MissionInfo.Region data)
-            {
-                this.Id = regionId;
-                this.Data = data;
-            }
-
-            public override String ToString()
-            {
-                return String.Format("DynamicRegion{0}", this.Id);
-            }
+        public override String ToString()
+        {
+            return String.Format("DynamicRegion{0}", this.Id);
         }
     }
 

@@ -20,7 +20,7 @@ namespace Aura.World.Scripting
         /// <param name="classId">Class Id of board prop</param>
         public void AddShadowMissionBoard(uint classId)
         {
-            MissionManager.Instance.AddShadowMissionBoard(0, classId);
+            MissionManager.Instance.AddShadowMissionBoard(classId);
         }
 
         /// <summary>

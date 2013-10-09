@@ -40,7 +40,7 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 		SetSpawn(1, 8874, 6802);
 		
 		// SetDefaultExit(0, 401, 81255, 126210); // Tara exit
-		InitTaraMission();
+		
 		
 		// Unknowns
 		SetUnknown13(63251);
@@ -50,8 +50,10 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 		SetVariationFile(region, "data/world/Tara_castle_gatehall/region_variation_1.xml");
 		SetRegionUnknown1(region, 100);
 		
-		AddToBoard(41699); // Shadow Mission board prop it's tied to (Tara)
-		AddToAltar(0x00A00191000D001E); // Altar prop it's tied to (Tara)
+		//AddToBoard(41699); // Shadow Mission board prop it's tied to (Tara)
+		//AddTrigger(0x00A00191000D001E); // Altar prop it's tied to (Tara)
+		
+		InitTaraMission(); // Adds to mission board, sets altar trigger, sets default exit
 		
 		HookMissionStart(OnMissionStart);
 		
@@ -109,7 +111,7 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 	}
 	*/
 	
-	private void OnMissionStart(ShadowMission mission) // Mission instance calls this
+	private void OnMissionStart(MabiMission mission) // Mission instance calls this
 	{
 		//InitMobs(mission);
 	

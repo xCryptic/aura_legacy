@@ -12,8 +12,7 @@ namespace Aura.World.World
     public class MissionManager
     {
         public static MissionManager Instance = new MissionManager();
-
-        // [#SM]
+        
         /// <summary>
         /// Current Shadow Missions sorted by region instance Id.
         /// </summary>
@@ -31,6 +30,12 @@ namespace Aura.World.World
         /// different Shadow Mission types? (Not that this should matter anyways..)
         /// </summary>
         private SmallIdPool _shadowMissionRegionPool = new SmallIdPool(35000, 60000); // (25,000 / 8) = 3,125 bytes of memory
+
+        /// <summary>
+        /// All users currently in shadow missions.
+        /// </summary>
+        private SortedDictionary<ulong, MabiMission> _smUsers
+            = new SortedDictionary<ulong, MabiMission>();
 
         /// <summary>
         /// Singleton constructor
@@ -51,10 +56,11 @@ namespace Aura.World.World
         }
 
         /// <summary>
-        /// Add a ShadowMissionBoard by prop Id? Might be different Id.
+        /// Add a mission board.
         /// </summary>
-        /// <param name="boardId"></param>
-        public void AddShadowMissionBoard(ulong propId, uint classId)
+        /// <param name="classId">Class Id of board to add</param>
+        /// <param name="propId">Board prop Id, currently unused</param>
+        public void AddShadowMissionBoard(uint classId, ulong propId = 0)
         {
             if (!_shadowMissionBoards.ContainsKey(classId))
             {
@@ -63,6 +69,11 @@ namespace Aura.World.World
             }
         }
 
+        /// <summary>
+        /// Add a shadow mission to a mission board.
+        /// </summary>
+        /// <param name="boardId">Id of the board to add to</param>
+        /// <param name="info">MissionInfo to add</param>
         public void AddShadowMission(uint boardId, MissionInfo info)
         {
             MissionBoard board = null;
@@ -171,15 +182,25 @@ namespace Aura.World.World
 
         private void HandleShadowMissionBoardTouch(WorldClient client, MabiPC character, MabiProp prop)
         {
-            // Do nothing for right now
+            // Handling the prop touch shouldn't be necessary
+            // 0x8EBF request is what triggers the mission list
         }
 
         private void HandleShadowMissionAltarTouch(WorldClient client, MabiPC character, MabiProp prop)
         {
-            // client.Send(PacketCreator.MsgBox(character, "This feature is not currently supported"));
-
-            //this.BeginShadowMission(701009, client.Character); // Hardcoded
             this.TryBeginShadowMission(character, prop.Id);
+        }
+
+        public bool IsEnteringMission(MabiPC player)
+        {
+            return this.IsEnteringMission(player.Id);
+        }
+
+        public bool IsEnteringMission(ulong playerId)
+        {
+            var mission = this.GetMissionOrNull(playerId);
+            if (mission == null) return false;
+            return mission.GetPlayerStatus(playerId) == MissionStatus.Entering;
         }
 
         /// <summary>
@@ -210,32 +231,115 @@ namespace Aura.World.World
             var players = new List<MabiPC>();
 
             var party = player.Party;
+            var members = new List<MabiCreature>();
             if (party == null)
             {
                 // Just this player
 
                 // Too few players
-                if (smInfo.PartyCountMin > 1)
-                    return false;
+                //if (smInfo.PartyCountMin > 1)
+                //    return false;
 
-                players.Add(player);
+                members.Add(player);
             }
             else
             {
-                var members = party.Members;
-
-                foreach (var member in members)
-                {
-                    if (member.IsPlayer && member is MabiPC)
-                        players.Add(member as MabiPC);
-                }
+                members = party.Members;
             }
+
+            // Check if obeys min/max
+            if (members.Count > smInfo.PartyCountMax
+            || members.Count < smInfo.PartyCountMin)
+                return false;
+
+            foreach (var member in members)
+            {
+                if (member.IsPlayer && member is MabiPC)
+                    players.Add(member as MabiPC);
+            }
+            
 
             // TODO: Perform check that all members meet various requirements
             // to play SM
 
             this.BeginShadowMission(smInfo, smQuest.MissionDifficulty, players.ToArray(), propId);
             return true;
+        }
+
+        /// <summary>
+        /// Get the mission a player is currently in, or null if none. Currently
+        /// checks only shadow missions.
+        /// </summary>
+        /// <param name="player">Player to check</param>
+        /// <returns>Mission the player is in, or null if none</returns>
+        public MabiMission GetMissionOrNull(MabiPC player)
+        {
+            return this.GetMissionOrNull(player.Id);
+        }
+
+        /// <summary>
+        /// Get the mission a player is currently in, or null if none. Currently
+        /// checks only shadow missions.
+        /// </summary>
+        /// <param name="player">Id of player to check</param>
+        /// <returns>Mission the player is in, or null if none</returns>
+        public MabiMission GetMissionOrNull(ulong playerId)
+        {
+            MabiMission mission = null;
+            lock (_smUsers)
+                _smUsers.TryGetValue(playerId, out mission);
+            return mission;
+        }
+
+        /// <summary>
+        /// Add multiple players to a MabiMission.
+        /// </summary>
+        /// <param name="players">Players to add</param>
+        /// <param name="mission">Mission to add players to</param>
+        public void AddPlayersToMission(IEnumerable<MabiPC> players, MabiMission mission)
+        {
+            foreach (MabiPC player in players)
+                this.AddPlayerToMission(player.Id, mission);
+        }
+
+        /// <summary>
+        /// Add a player to a mission.
+        /// </summary>
+        /// <param name="playerId">Player to add</param>
+        /// <param name="mission">Mission to add player to</param>
+        public void AddPlayerToMission(ulong playerId, MabiMission mission)
+        {
+            try
+            {
+                lock(_smUsers)
+                    _smUsers.Add(playerId, mission);
+            }
+            catch (ArgumentException) // Thrown when playerId is already a key
+            {
+                // Remove key
+                lock(_smUsers)
+                    _smUsers.Remove(playerId);
+
+                // Could do a recursive call here, but would lead to inf loop if something
+                // else messed up, just throw
+                throw;
+            }
+        }
+
+        public void RemovePlayersFromMission(IEnumerable<ulong> players)
+        {
+            foreach (ulong player in players)
+            {
+                this.RemovePlayerFromMission(player);
+            }
+        }
+
+        public bool RemovePlayerFromMission(ulong playerId)
+        {
+            bool r = false;
+            lock (_smUsers)
+                r = _smUsers.Remove(playerId);
+            return r;
         }
     }
 }

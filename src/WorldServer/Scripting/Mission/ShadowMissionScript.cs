@@ -26,7 +26,7 @@ namespace Aura.World.Scripting
             else e[this.MissionInfo.Class] = this.MissionInfo.QuestInfo;
         }
 
-        public MissionInfo.Region AddRegion(uint mapId)
+        public MissionRegionInfo AddRegion(uint mapId)
         {
             return this.MissionInfo.AddRegion(mapId);
         }
@@ -40,9 +40,13 @@ namespace Aura.World.Scripting
             MissionManager.Instance.AddShadowMission(classId, this.MissionInfo);
         }
 
-        public void AddToAltar(ulong propId)
+        /// <summary>
+        /// Add a prop which triggers this mission.
+        /// </summary>
+        /// <param name="propId"></param>
+        public void AddTrigger(ulong propId)
         {
-            this.MissionInfo.AddAltar(propId);
+            this.MissionInfo.AddTrigger(propId);
         }
 
         public void Complete(MabiMission mission, bool receiveRewards = true)
@@ -76,7 +80,7 @@ namespace Aura.World.Scripting
             this.MissionInfo.ExitSpawnY = y;
         }
 
-        public void SetDirectoryName(MissionInfo.Region region, string directory)
+        public void SetDirectoryName(MissionRegionInfo region, string directory)
         {
             region.DirectoryName = directory;
         }
@@ -163,17 +167,17 @@ namespace Aura.World.Scripting
             this.MissionInfo.Special = unk;
         }
 
-        public void SetRegionUnknown1(MissionInfo.Region region, uint unk)
+        public void SetRegionUnknown1(MissionRegionInfo region, uint unk)
         {
             region.Unknown1 = unk;
         }
 
-        public void SetRegionUnknown2(MissionInfo.Region region, byte unk)
+        public void SetRegionUnknown2(MissionRegionInfo region, byte unk)
         {
             region.Unknown2 = unk;
         }
 
-        public void SetVariationFile(MissionInfo.Region region, string file)
+        public void SetVariationFile(MissionRegionInfo region, string file)
         {
             region.VariationFile = file;
         }
@@ -230,7 +234,7 @@ namespace Aura.World.Scripting
         {
             SetDefaultExit(0, 401, 81255, 126210); // Tara exit
             AddToBoard(41699); // Shadow Mission board prop it's tied to (Tara)
-            AddToAltar(0x00A00191000D001E); // Altar prop it's tied to (Tara)
+            AddTrigger(0x00A00191000D001E); // Altar prop it's tied to (Tara)
         }
 
         /// <summary>

@@ -133,7 +133,24 @@ namespace Aura.World.World
 				var val = de.Value as QuestObjectiveInfo;
 				this.Progresses.Add(key, new MabiQuestProgress(key, val.Unlocked));
 			}
+
+            this.Tags = MabiQuest.DefaultTags();
 		}
+
+        public static MabiTags DefaultTags()
+        {
+            //packet.PutString("QMBEXP:f:1.000000;QMBGLD:f:1.000000;QMSMEXP:f:1.000000;QMSMGLD:f:1.000000;QMAMEXP:f:1.000000;QMAMGLD:f:1.000000;QMBHDCTADD:4:0;QMGNRB:f:1.000000;QMGNRB:f:1.000000;");
+            var tags = new MabiTags();
+            tags.SetFloat("QMBEXP", 1f); // Exp?
+            tags.SetFloat("QMBGLD", 1f); // Gold?
+            tags.SetFloat("QMSMEXP", 1f); // Probably shadow missions
+            tags.SetFloat("QMSMGLD", 1f); // ^
+            tags.SetFloat("QMAMEXP", 1f); // Probably theatre missions
+            tags.SetFloat("QMAMGLD", 1f); // ^
+            tags.SetInt("QMBHDCTADD", 0); // ?
+            tags.SetFloat("QMGNRB", 1f); // Is added to string twice..? Official server bug?
+            return tags;
+        }
 
 		public MabiQuestProgress CurrentProgress
 		{
