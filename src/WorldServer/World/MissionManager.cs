@@ -291,6 +291,17 @@ namespace Aura.World.World
             return mission;
         }
 
+        public void RemoveMission(uint regionId)
+        {
+            lock (_shadowMissionInstances)
+                _shadowMissionInstances.Remove(regionId);
+        }
+
+        public void RemoveMission(MabiMission mission)
+        {
+            this.RemoveMission(mission.Id);
+        }
+
         /// <summary>
         /// Add multiple players to a MabiMission.
         /// </summary>

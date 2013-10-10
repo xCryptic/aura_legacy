@@ -12,6 +12,7 @@ using Aura.World.Network;
 using Aura.World.Scripting;
 using Aura.Shared.Util;
 using Aura.World.Player;
+using System.Threading;
 
 namespace Aura.World.World
 {
@@ -608,6 +609,15 @@ namespace Aura.World.World
         private Object _indicesLock = new Object();
 
         /// <summary>
+        /// Pseudo-Id of this mission instance. Is just a wrapper for the
+        /// uint Id of the starting region instance.
+        /// </summary>
+        public uint Id
+        {
+            get { return this.StartingRegion.Id; }
+        }
+
+        /// <summary>
         /// All region instances associated with this Shadow Mission.
         /// Make some RegionContainer parent class later (Dungeons will have Regions too)
         /// </summary>
@@ -631,6 +641,11 @@ namespace Aura.World.World
         // Only includes players, one per client, no pets
         protected SortedDictionary<ulong, MabiCreature> _players = new SortedDictionary<ulong, MabiCreature>();
         protected Object _playersLock = new Object();
+
+        private SortedDictionary<ulong, MissionPlayer> __players
+            = new SortedDictionary<ulong, MissionPlayer>();
+
+        private ReaderWriterLock __playersLock = new ReaderWriterLock();
 
         public uint PlayerCount
         {
@@ -675,6 +690,9 @@ namespace Aura.World.World
                 return this.Regions[0];
             }
         }
+
+        private SortedDictionary<ulong, MabiProp> _markers
+            = new SortedDictionary<ulong, MabiProp>();
 
         private SortedDictionary<ulong, MissionStatus> _statuses
             = new SortedDictionary<ulong, MissionStatus>();
@@ -729,6 +747,14 @@ namespace Aura.World.World
                         _disposables.Add(d);
         }
 
+        /// <summary>
+        /// Dispose this mission if all participants have left it.
+        /// </summary>
+        public void DisposeIfEmpty()
+        {
+            if (this.IsEmpty) this.Dispose();
+        }
+
         public void Complete(bool receiveRewards = false)
         {
             lock (_playersLock)
@@ -745,6 +771,14 @@ namespace Aura.World.World
                     WorldManager.Instance.CreatureCompletesQuest(player, quest, receiveRewards);
                 }
             }
+        }
+
+        /// <summary>
+        /// Check if this mission is empty of players.
+        /// </summary>
+        public bool IsEmpty
+        {
+            get { return this._players.Count == 0; }
         }
 
         public void SetPlayerStatus(ulong playerId, MissionStatus status)
@@ -776,6 +810,7 @@ namespace Aura.World.World
                 foreach (var d in _disposables)
                     d.Dispose();
 
+            MissionManager.Instance.RemoveMission(this);
         }
 
         /// <summary>
@@ -793,6 +828,38 @@ namespace Aura.World.World
                 this.Regions[count] = new MissionRegion(regionIds[count], region);
                 count++;
             }
+        }
+
+        public void AddMarker(MabiProp prop)
+        {
+            lock (_markers)
+            {
+                _markers.Add(prop.Id, prop);
+            }
+        }
+
+        /// <summary>
+        /// Add this mission's prop markers to a packet.
+        /// TODO: Make this a Send function.
+        /// </summary>
+        /// <param name="packet"></param>
+        public void AddMarkersToPacket(MabiPacket packet)
+        {
+            lock (_markers)
+            {
+                packet.PutInt((uint)_markers.Count);
+                foreach (MabiProp prop in _markers.Values)
+                {
+                    var position = prop.GetPosition();
+                    packet.PutInt(prop.Region)
+                        .PutLong(prop.Id)
+                        .PutByte(2) // ?
+                        .PutInt(position.X)
+                        .PutInt(position.Y)
+                        .PutInt(0xFF529CFF); // Some const?
+                }
+            }
+            packet.PutInt(0);
         }
 
         public void AddToPacket(MabiPacket packet, uint playerIndex, bool isPet = false)
@@ -949,7 +1016,7 @@ namespace Aura.World.World
             player.Quests.Remove(quest.Info.Id);
 
             // Send region data
-            var regionPacket = new MabiPacket(Op.ShadowMissionRegionR, Id.Broadcast);
+            var regionPacket = new MabiPacket(Op.ShadowMissionRegionR, Aura.Shared.Const.Id.Broadcast);
             regionPacket.PutLong(player.Id); // Might not be creature.Id
             this.AddToPacket(regionPacket, playerIndex);
             client.Send(regionPacket);
@@ -970,6 +1037,44 @@ namespace Aura.World.World
             // See AfterEnter()
 
             this.SetPlayerStatus(player.Id, MissionStatus.Entering);
+        }
+
+        public bool HasPlayer(MabiPC player)
+        {
+            return this.HasPlayer(player.Id);
+        }
+
+        public bool HasPlayer(ulong id)
+        {
+            bool a = false;
+            lock (_players)
+                a = _playerIndices.ContainsKey(id);
+            return a;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="player"></param>
+        private void OnPlayerLoggedOff(MabiPC player)
+        {
+            // Player not in mission
+            if (!this.HasPlayer(player)) return;
+
+            // Remove quest
+            var quest = player.GetShadowMissionQuestOrNull();
+            if (quest != null)
+            {
+                player.Quests.Remove(quest.Class);
+                WorldManager.Instance.CreatureCompletesQuest(player, quest, false);
+            }
+
+            // Set to exit area
+            player.Region = this.MissionInfo.ExitRegion;
+            player.SetPosition(this.MissionInfo.ExitSpawnX, this.MissionInfo.ExitSpawnY);
+
+            this.ExitPlayer(player);
+            this.DisposeIfEmpty();
         }
 
         /// <summary>
@@ -1028,7 +1133,7 @@ namespace Aura.World.World
 
             // Send a 0xA925 { RegionUnknown2, (int)0 }
             // This is actually already sent by Aura as a response to EnterRegion
-            var unkPacket = new MabiPacket(0xA925, Id.Broadcast);
+            var unkPacket = new MabiPacket(0xA925, Aura.Shared.Const.Id.Broadcast);
             unkPacket.PutInt(this.StartingRegion.Id);
             unkPacket.PutInt(0);
             client.Send(unkPacket);
@@ -1066,9 +1171,30 @@ namespace Aura.World.World
             // with 0xA90C, seems to contain data/positions of next wave of monsters?
             
             this.SetPlayerStatus(player.Id, MissionStatus.In);
+
+            Events.EventManager.PlayerEvents.PlayerLoggedOff += OnPlayerLoggedOff;
         }
 
         public void Exit(MabiPC player)
+        {
+            if (!(player.Client is WorldClient)) return;
+            var client = player.Client as WorldClient;
+
+            // Remove from several lists
+            this.ExitPlayer(player);
+
+            // Can use normal warp here
+            client.Warp(this.MissionInfo.ExitRegion, this.MissionInfo.ExitSpawnX, this.MissionInfo.ExitSpawnY);
+            client.Send(new MabiPacket(Op.ShadowMissionExitR, client.Character.Id).PutByte(1)); // Success
+
+            this.DisposeIfEmpty();
+        }
+
+        /// <summary>
+        /// Removes player from a bunch of different things required upon exit.
+        /// </summary>
+        /// <param name="player">Player that is exiting</param>
+        public void ExitPlayer(MabiPC player)
         {
             if (!(player.Client is WorldClient)) return;
             var client = player.Client as WorldClient;
@@ -1093,10 +1219,6 @@ namespace Aura.World.World
                 player.Quests.Remove(quest.Class);
                 WorldManager.Instance.CreatureCompletesQuest(player, quest, false); // Trying this..
             }
-
-            // Can use normal warp here
-            client.Warp(this.MissionInfo.ExitRegion, this.MissionInfo.ExitSpawnX, this.MissionInfo.ExitSpawnY);
-            client.Send(new MabiPacket(Op.ShadowMissionExitR, client.Character.Id).PutByte(1)); // Success
         }
 
         /// <summary>
@@ -1141,6 +1263,23 @@ namespace Aura.World.World
         public override String ToString()
         {
             return String.Format("DynamicRegion{0}", this.Id);
+        }
+    }
+
+    /// <summary>
+    /// Wrapper class for a player in a MabiMission. Currently just used to
+    /// group MabiPC, Index, MissionStatus together, so no need for multiple dictionaries.
+    /// </summary>
+    public class MissionPlayer
+    {
+        public MabiPC Player = null;
+        public MissionStatus Status = MissionStatus.None;
+        public byte Index = 0;
+
+        public MissionPlayer(MabiPC player, byte index)
+        {
+            this.Player = player;
+            this.Index = index;
         }
     }
 

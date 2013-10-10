@@ -75,6 +75,31 @@ namespace Aura.World.World
 			get { return 160; }
 		}
 
+        /// <summary>
+        /// Whether or not a prop is touchable. This modifies the prop Id, as
+        /// an Id such as YYYYYYYY0001XXXX is touchable, whereas
+        /// YYYYYYYYFFFFXXXX is not touchable. This is more of a temporary
+        /// workaround.
+        /// </summary>
+        public bool IsTouchable
+        {
+            get { return ((this.Id & 0xFFFF0000) == 0x00010000); }
+            set
+            {
+                // Set touchable
+                if (value)
+                {
+                    this.Id &= 0xFFFFFFFF0000FFFFL;
+                    this.Id |= 0x10000L;
+                }
+                // Set untouchable
+                else
+                {
+                    this.Id |= 0xFFFF0000L;
+                }
+            }
+        }
+
 		public MabiProp(ulong id, uint region, uint x, uint y)
 		{
 			this.Id = id;

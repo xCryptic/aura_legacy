@@ -131,6 +131,8 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 			);
 		
 		// Spawn the orb group
-		var group = SpawnBlinkingOrbGroup(tempRegion, positions, orb => { Complete(mission); });
+		var group = SpawnBlinkingOrbGroup(tempRegion, positions, orb => { Complete(mission); }, 3000); // Auto-adds to disposables?
+		
+		SetMarkers(mission, group); // To activate orbs and make them hittable, they must be set as markers
 	}
 }

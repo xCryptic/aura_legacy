@@ -402,6 +402,8 @@ namespace Aura.World.World
 			{
 				try
 				{
+                    // Controversial
+                    EventManager.PlayerEvents.OnPlayerLoggedOff(_clients[i].Character);
 					// Saving is more important than a clean disconnect.
 					WorldDb.Instance.SaveAccount(_clients[i].Account);
 					_clients[i].Disconnect(0);

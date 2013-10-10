@@ -111,6 +111,11 @@ namespace Aura.World.Events
 			/// Fired a few seconds after the player logged in successfully.
 			/// </summary>
 			public static event PlayerEventHandler PlayerLoggedIn;
+            /// <summary>
+            /// Fired after a player logs off, but before anything saved to the db.
+            /// Also fired after a player is disconnected unexpectedly.
+            /// </summary>
+            public static event PlayerEventHandler PlayerLoggedOff;
 			/// <summary>
 			/// Fired when a player is changing regions (EnterRegion).
 			/// </summary>
@@ -129,6 +134,12 @@ namespace Aura.World.Events
 				if (PlayerLoggedIn != null)
 					PlayerLoggedIn(character);
 			}
+
+            public static void OnPlayerLoggedOff(MabiPC character)
+            {
+                if (PlayerLoggedOff != null)
+                    PlayerLoggedOff(character);
+            }
 
 			public static void OnPlayerChangesRegion(MabiPC character)
 			{

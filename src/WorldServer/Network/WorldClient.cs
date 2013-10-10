@@ -39,6 +39,8 @@ namespace Aura.World.Network
 		{
 			if (this.State != ClientState.Dead)
 			{
+                EventManager.PlayerEvents.OnPlayerLoggedOff(this.Character);
+
 				foreach (var creature in this.Creatures)
 					WorldManager.Instance.RemoveCreature(creature);
 

@@ -36,13 +36,12 @@ namespace Aura.World.Scripting
         {
             // Note: Color2 is orb color, all others are default (do nothing probably)
             MabiOrbProp orb = new MabiOrbProp(regionId, x, y, callback); // Hardcoded for now
-            orb.UseExtraData = false;
-            orb.State = "on";
+            orb.IsOn = true;
 
             // These might not be constant.. check more orbs
-            orb.Info.__unknown65 = 0x31;
-            orb.Info.__unknown66 = 0x2C;
-            orb.Info.__unknown67 = 0x34;
+            //orb.Info.__unknown65 = 0x31;
+            //orb.Info.__unknown66 = 0x2C;
+            //orb.Info.__unknown67 = 0x34;
 
             WorldManager.Instance.AddProp(orb);
             return orb;
@@ -51,7 +50,7 @@ namespace Aura.World.Scripting
         public List<Tuple<uint, uint>> Positions(params uint[] p)
         {
             var list = new List<Tuple<uint, uint>>();
-            for (int i = 0; (i + 2) < p.Length; i += 2)
+            for (int i = 0; (i + 1) < p.Length; i += 2)
             {
                 list.Add(new Tuple<uint, uint>(p[i], p[i + 1]));
             }
@@ -136,7 +135,7 @@ namespace Aura.World.World
         /// </summary>
         public MabiOrbGroup Group = null;
 
-        public bool On
+        public bool IsOn
         {
             get { return (this.State != null && this.State.Equals("on")); }
             set { this.State = (value ? "on" : "off"); }
@@ -152,6 +151,11 @@ namespace Aura.World.World
         {
             if (callback != null)
                 this.OnHit += callback;
+
+            this.IsTouchable = true;
+            this.UseExtraData = false;
+
+            this.InitOrb();
         }
 
         public MabiPropBehavior Behavior = null;
@@ -221,7 +225,7 @@ namespace Aura.World.World
             }
         }
 
-        protected void InitOrbs(MabiOrbProp[] orbs)
+        protected void InitOrbs(IEnumerable<MabiOrbProp> orbs)
         {
             foreach (var orb in orbs)
             {
@@ -323,18 +327,21 @@ namespace Aura.World.World
             uint deltaTime = 10000, uint maxEnabled = 0, OrbHitCallback badOrb = null)
             : base(orb, callback)
         {
-            this.OnHitBadOrb = badOrb;
-            _deltaTime = deltaTime;
-            _remaining = maxEnabled;
+            _Init(deltaTime, maxEnabled, badOrb);
         }
 
         public BlinkingOrbGroup(MabiOrbProp[] orbs, OrbGroupCompleteCallback callback,
             uint deltaTime = 10000, uint maxEnabled = 0, OrbHitCallback badOrb = null)
             : base(orbs, callback)
         {
+            _Init(deltaTime, maxEnabled, badOrb);
+        }
+
+        private void _Init(uint deltaTime, uint maxEnabled, OrbHitCallback badOrb)
+        {
             this.OnHitBadOrb = badOrb;
             _deltaTime = deltaTime;
-            _remaining = maxEnabled;
+            _remaining = maxEnabled; //maxEnabled == 0 ? (uint)this.Orbs.Count : maxEnabled;
         }
 
         public override void Dispose()
@@ -363,7 +370,7 @@ namespace Aura.World.World
         {
             // Don't overwrite custom Remaining value
             if (_remaining == 0)
-                _remaining = (uint)(this.Orbs.Count - 1);
+                _remaining = (uint)(this.Orbs.Count);
 
             foreach (var pair in this.Orbs)
                 _orbStatuses.Add(pair.Key, false);
@@ -374,6 +381,11 @@ namespace Aura.World.World
             this.Refresh();
         }
 
+        /// <summary>
+        /// Called when an orb in this group is hit.
+        /// TODO: Needs a lock.
+        /// </summary>
+        /// <param name="orb"></param>
         protected override void OnOrbHit(MabiOrbProp orb)
         {
             //bool status = false;
@@ -383,11 +395,11 @@ namespace Aura.World.World
             //    throw new Exception(String.Format("OrbStatuses entry could not be found for prop Id: {0}", orb.Id));
             //}
 
-            bool status = orb.On;
+            bool status = orb.IsOn;
 
             if (status) // Hit a good orb
             {
-                orb.On = false;
+                orb.IsOn = false;
 
                 //WorldManager.Instance.SendPropUpdate(orb);
                 Send.PropUpdate(orb);
@@ -406,28 +418,29 @@ namespace Aura.World.World
 
         private void Refresh(object state = null)
         {
+
             // Nothing to do
-            if (_remaining == this.Orbs.Count)
-                return;
+            //if (_remaining == this.Orbs.Count)
+            //    return;
 
             ulong[] vals = RandomUtil.UniqueLongs(0, (ulong)this.Orbs.Count, (uint)_remaining);
 
-            //String debug = "Orbs: ";
+            String debug = "Refresh(): Orbs: ";
             // Temp, for debugging purposes
-            //foreach (ulong val in vals)
-            //{
-            //    debug += (val + ", ");
-            //}
-            //Aura.Shared.Util.Logger.Info(debug);
+            foreach (ulong val in vals)
+            {
+                debug += (val + ", ");
+            }
+            Aura.Shared.Util.Logger.Info(debug);
 
             foreach (var orb in this.Orbs.Values)
-                orb.On = false;
+                orb.IsOn = false;
 
             foreach (ulong val in vals)
             {
                 var pair = this.Orbs.ElementAt((int)val);
                 var orb = pair.Value;
-                orb.On = true;
+                orb.IsOn = true;
             }
 
             // Send necessary prop updates
@@ -435,13 +448,13 @@ namespace Aura.World.World
             {
                 var wasPrevOn = _orbStatuses[pair.Key];
                 var orb = pair.Value;
-                var isOn = orb.On;
+                var isOn = orb.IsOn;
 
                 if (wasPrevOn != isOn)
                     Send.PropUpdate(orb);
                 //WorldManager.Instance.SendPropUpdate(orb);
 
-                _orbStatuses[pair.Key] = orb.On;
+                _orbStatuses[pair.Key] = orb.IsOn;
             }
 
         }

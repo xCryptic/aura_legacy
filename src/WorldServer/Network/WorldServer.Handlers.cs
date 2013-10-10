@@ -159,6 +159,7 @@ namespace Aura.World.Network
             this.RegisterPacketHandler(Op.ShadowMissionMap, HandleShadowMissionMap);
             this.RegisterPacketHandler(Op.ShadowMissionAccept, HandleShadowMissionAccept);
             this.RegisterPacketHandler(Op.ShadowMissionExit, HandleShadowMissionExit);
+            this.RegisterPacketHandler(0xA90B, HandleMinimapPropMarkers);
 
 			// Temp/Unknown
 			// --------------------------------------------------------------
@@ -307,6 +308,8 @@ namespace Aura.World.Network
 		private void HandleDisconnect(WorldClient client, MabiPacket packet)
 		{
 			var unk1 = packet.GetByte(); // 1 | 2 (maybe login vs exit?)
+
+            EventManager.PlayerEvents.OnPlayerLoggedOff(client.Character);
 
 			Logger.Info("'{0}' is closing the connection. Saving...", client.Account.Name);
 
@@ -3509,6 +3512,19 @@ namespace Aura.World.Network
 
             // Exit will need thread safety/locking..
             // Otherwise Exit request spamming could cause problems
+        }
+
+        private void HandleMinimapPropMarkers(WorldClient client, MabiPacket packet)
+        {
+            var character = client.Character as MabiPC;
+            if (character == null) return;
+
+            var res = new MabiPacket(0xA90C, character.Id);
+            var mission = MissionManager.Instance.GetMissionOrNull(character);
+            if (mission == null) return; // Might apply to more than just missions, but unsure
+
+            mission.AddMarkersToPacket(res);
+            client.Send(res);
         }
 	}
 }

@@ -252,5 +252,11 @@ namespace Aura.World.Scripting
                 throw new Exception("Tried to get a RegionHandler for a region that does not exist");
             return mission.Regions[regionIndex].Id;
         }
+
+        public void SetMarkers(MabiMission mission, MabiOrbGroup orbs)
+        {
+            foreach (var orb in orbs.Orbs.Values)
+                mission.AddMarker(orb);
+        }
     }
 }
