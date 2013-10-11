@@ -8,6 +8,7 @@ using Aura.Data;
 using System.Threading;
 using Aura.World.Player;
 using Aura.World.Network;
+using Aura.Shared.Network;
 
 namespace Aura.World.Scripting
 {
@@ -323,6 +324,11 @@ namespace Aura.World.World
         private Timer _refreshTimer = null;
         private Object _timerLock = new Object();
 
+        /// <summary>
+        /// PRNG used in Refresh.
+        /// </summary>
+        private System.Random _random = Aura.Shared.Util.RandomProvider.Get();
+
         public BlinkingOrbGroup(MabiOrbProp orb, OrbGroupCompleteCallback callback,
             uint deltaTime = 10000, uint maxEnabled = 0, OrbHitCallback badOrb = null)
             : base(orb, callback)
@@ -342,6 +348,19 @@ namespace Aura.World.World
             this.OnHitBadOrb = badOrb;
             _deltaTime = deltaTime;
             _remaining = maxEnabled; //maxEnabled == 0 ? (uint)this.Orbs.Count : maxEnabled;
+
+            // Copied from old Init():
+            // Don't overwrite custom Remaining value
+            if (_remaining == 0)
+                _remaining = (uint)(this.Orbs.Count);
+
+            foreach (var pair in this.Orbs)
+                _orbStatuses.Add(pair.Key, false);
+
+            lock (_timerLock)
+                _refreshTimer = new Timer(this.Refresh, null, 0, _deltaTime);
+
+            this.Refresh();
         }
 
         public override void Dispose()
@@ -365,27 +384,26 @@ namespace Aura.World.World
                 }
             }
         }
-
+        
         protected override void Init()
         {
-            // Don't overwrite custom Remaining value
-            if (_remaining == 0)
-                _remaining = (uint)(this.Orbs.Count);
-
-            foreach (var pair in this.Orbs)
-                _orbStatuses.Add(pair.Key, false);
-
-            lock (_timerLock)
-                _refreshTimer = new Timer(this.Refresh, null, 0, _deltaTime);
-
-            this.Refresh();
+        //    // Don't overwrite custom Remaining value
+        //    if (_remaining == 0)
+        //        _remaining = (uint)(this.Orbs.Count);
+        //
+        //    foreach (var pair in this.Orbs)
+        //        _orbStatuses.Add(pair.Key, false);
+        //
+        //    lock (_timerLock)
+        //        _refreshTimer = new Timer(this.Refresh, null, 0, _deltaTime);
+        //
+        //    this.Refresh();
         }
 
         /// <summary>
         /// Called when an orb in this group is hit.
-        /// TODO: Needs a lock.
         /// </summary>
-        /// <param name="orb"></param>
+        /// <param name="orb">Orb that was hit</param>
         protected override void OnOrbHit(MabiOrbProp orb)
         {
             //bool status = false;
@@ -395,53 +413,55 @@ namespace Aura.World.World
             //    throw new Exception(String.Format("OrbStatuses entry could not be found for prop Id: {0}", orb.Id));
             //}
 
-            bool status = orb.IsOn;
-
-            if (status) // Hit a good orb
+            // Two people hitting an active orb at once could cause race issues..
+            // Makes the assumptions that Complete, OnHitBadOrb callbacks don't
+            // lock this orb as well
+            lock (orb)
             {
-                orb.IsOn = false;
-
-                //WorldManager.Instance.SendPropUpdate(orb);
-                Send.PropUpdate(orb);
-
-                _remaining--;
-                if (_remaining == 0)
+                bool status = orb.IsOn;
+                
+                if (status) // Hit a good orb
                 {
-                    this.DisposeTimer();
+                    orb.IsOn = false;
+                    _orbStatuses[orb.Id] = false;
 
-                    this.Complete();
+                    Send.PropUpdate(orb);
+                    
+                    _remaining--;
+                    
+                    if (_remaining == 0)
+                    {
+                        this.DisposeTimer();
+                        
+                        this.Complete();
+                    }
                 }
+                else if (this.OnHitBadOrb != null) // If you want a bad orb event..
+                    this.OnHitBadOrb(orb);
             }
-            else if (this.OnHitBadOrb != null) // If you want a bad orb event..
-                this.OnHitBadOrb(orb);
         }
 
+        /// <summary>
+        /// Called on timely refresh.
+        /// TODO: Send prop updates all in one packet, instead of
+        /// one per packet.
+        /// </summary>
+        /// <param name="state"></param>
         private void Refresh(object state = null)
         {
-
             // Nothing to do
-            //if (_remaining == this.Orbs.Count)
-            //    return;
-
-            ulong[] vals = RandomUtil.UniqueLongs(0, (ulong)this.Orbs.Count, (uint)_remaining);
-
-            String debug = "Refresh(): Orbs: ";
-            // Temp, for debugging purposes
-            foreach (ulong val in vals)
-            {
-                debug += (val + ", ");
-            }
-            Aura.Shared.Util.Logger.Info(debug);
-
+            if (_remaining == this.Orbs.Count)
+                return;
+            
+            List<MabiOrbProp> o = this.Orbs.Values.ToList<MabiOrbProp>();
+            o = this.RandomOrbs(o, _remaining);
+            
+            // These 2 for loops together might not be most efficient method
             foreach (var orb in this.Orbs.Values)
-                orb.IsOn = false;
+                lock (orb) { orb.IsOn = false; }
 
-            foreach (ulong val in vals)
-            {
-                var pair = this.Orbs.ElementAt((int)val);
-                var orb = pair.Value;
-                orb.IsOn = true;
-            }
+            foreach (var orb in o)
+                lock (orb) { orb.IsOn = true; }
 
             // Send necessary prop updates
             foreach (var pair in this.Orbs)
@@ -450,54 +470,26 @@ namespace Aura.World.World
                 var orb = pair.Value;
                 var isOn = orb.IsOn;
 
-                if (wasPrevOn != isOn)
+                // Leave commented for now:
+                //if (wasPrevOn != isOn)
                     Send.PropUpdate(orb);
-                //WorldManager.Instance.SendPropUpdate(orb);
 
                 _orbStatuses[pair.Key] = orb.IsOn;
             }
-
         }
-    }
 
-    /// <summary>
-    /// Move me later
-    /// </summary>
-    public static class RandomUtil
-    {
-        public static ulong[] UniqueLongs(ulong start, ulong end, uint count)
+        public List<MabiOrbProp> RandomOrbs(List<MabiOrbProp> orbs, uint count)
         {
-            // Swap
-            if (start > end)
+            if (count >= orbs.Count) return orbs;
+
+            int remove = (int)(orbs.Count - count);
+
+            for (int i = 0; i < remove; i++)
             {
-                ulong temp = start;
-                start = end;
-                end = temp;
+                orbs.RemoveAt(_random.Next(orbs.Count));
             }
 
-            uint diff = (uint)(end - start);
-
-            ulong[] ret; // To return
-            if (diff > count) count = diff; // If count is higher than it should be
-            ret = new ulong[count];
-
-            var rng = new System.Random(); //new Aura.Data.MTRandom();
-
-            for (int i = 0; i < count && i < diff; i++)
-            {
-                byte[] buffer = new byte[8];
-                rng.NextBytes(buffer);
-                ulong val = (BitConverter.ToUInt64(buffer, 0) % diff) + start;
-
-                // Should never lead to inf loop.. if it does, is a bug
-                // If collision, just add 1.. Only workable on small set, NOT actually random
-                //while (ret.Contains(val))
-                //    val = ((val + 1) % diff);
-
-                ret[i] = val;
-            }
-
-            return ret;
+            return orbs;
         }
     }
 }

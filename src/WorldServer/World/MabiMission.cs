@@ -136,6 +136,11 @@ namespace Aura.World.World
         /// </summary>
         public MabiMission.Callback OnMissionStart = null;
 
+        /// <summary>
+        /// Function called when a mission's time limit is expired.
+        /// </summary>
+        public MabiMission.Callback OnTimeOut = null;
+
         // Arg 1, class Id
         // public uint Class = 0;
 
@@ -373,7 +378,7 @@ namespace Aura.World.World
         /// </summary>
         /// <param name="creature"></param>
         /// <returns>MabiQuest, or null if an error occurred</returns>
-        public MabiQuest GenerateQuestOrNull(MabiCreature creature, byte difficulty)
+        public MabiQuest GenerateQuestOrNull(MabiCreature creature, byte difficulty, bool exitButton = true)
         {
             // Should get QuestInfo from database, added by respective SM script
             var quest = new MabiQuest(this.Class);
@@ -381,12 +386,10 @@ namespace Aura.World.World
             quest.MissionDifficulty = difficulty;
 
             quest.Tags = this.GetTags((Difficulty)difficulty);
-            // Older class before I found Tags:
-            //quest.QMValues = this.GetQMValues((Difficulty)difficulty);
 
-            quest.ShowExitButton = true;
-            quest.Info.Unknown2 = 1;
-            quest.Info.Type = 7;
+            quest.ShowExitButton = exitButton;
+            quest.Info.Unknown2 = 1; // ?
+            quest.Info.Type = 7; // Shadow Mission type
 
             return quest;
         }
@@ -793,25 +796,24 @@ namespace Aura.World.World
                 var quest = mp.Player.GetShadowMissionQuestOrNull();
                 if (quest == null) continue;
                 
-                WorldManager.Instance.CreatureCompletesQuest(mp.Player, quest, receiveRewards);
+                // Does not send a QuestClear, sends a QuestUpdate and QuestOwlComplete
+                // Actually sends to both character and a pet if one is summoned
+
+                // Seems different from QuestUpdate in Send.Quest
+                // Might be because shadow mission?
+                var qu = new MabiPacket(Op.QuestUpdate, mp.Player.Id)
+                    .PutLong(quest.Id)
+                    .PutByte(1)
+                    .PutByte(2)
+                    .PutInt(0)
+                    .PutByte(0)
+                    .PutByte(1);
+
+                // Send "owl" and give rewards, but don't clear
+                WorldManager.Instance.CreatureCompletesQuest(mp.Player, quest, receiveRewards, false);
             }
 
             _playersLock.ReleaseReaderLock();
-
-            //lock (_playersLock)
-            //{
-            //    // Assuming only players..
-            //    foreach (var pair in _players)
-            //    {
-            //        if (!(pair.Value is MabiPC)) continue;
-            //        var player = pair.Value as MabiPC;
-            //
-            //        var quest = player.GetShadowMissionQuestOrNull();
-            //        if (quest == null) continue;
-            //
-            //        WorldManager.Instance.CreatureCompletesQuest(player, quest, receiveRewards);
-            //    }
-            //}
         }
 
         public void AddMissionPlayer(MabiPC player, uint index)
@@ -921,13 +923,6 @@ namespace Aura.World.World
         {
             var mp = this.GetMissionPlayer(playerId);
             if (mp != null) mp.Status = status;
-
-            //lock (_statuses)
-            //{
-            //    if (_statuses.ContainsKey(playerId))
-            //        _statuses[playerId] = status;
-            //    else _statuses.Add(playerId, status);
-            //}
         }
 
         /// <summary>
@@ -1041,15 +1036,6 @@ namespace Aura.World.World
                 packet.PutString(varFile);
             }
         }
-
-        //public void AddPlayerIndex(ulong creatureId, uint index)
-        //{
-        //    lock (_indicesLock)
-        //    {
-        //        try { _playerIndices.Add(creatureId, index); }
-        //        catch { }
-        //    }
-        //}
 
         /// <summary>
         /// Have a user/creature enter the shadow mission.
@@ -1228,7 +1214,7 @@ namespace Aura.World.World
             // Send all PropAppears (props)
             // Send a QuestNew for SM quest, will have new Id
             //var quest = new MabiQuest(this.MissionInfo.Class);
-            var quest = this.MissionInfo.GenerateQuestOrNull(player, _difficulty);
+            var quest = this.MissionInfo.GenerateQuestOrNull(player, _difficulty, true);
             player.Quests[quest.Class] = quest;
 
             Send.QuestNew(player, quest);
@@ -1286,6 +1272,10 @@ namespace Aura.World.World
             Events.EventManager.PlayerEvents.PlayerLoggedOff += OnPlayerLoggedOff;
         }
 
+        /// <summary>
+        /// Have a currently connected player exit the mission.
+        /// </summary>
+        /// <param name="player">Exiting player</param>
         public void Exit(MabiPC player)
         {
             if (!(player.Client is WorldClient)) return;
@@ -1339,6 +1329,27 @@ namespace Aura.World.World
                 props.AddRange(WorldManager.Instance.GetPropsInRegion(region.Id));
             }
             return props;
+        }
+
+        public MabiProp SpawnChest(uint region, uint x, uint y, float dir)
+        {
+            MabiProp chest = new MabiProp(41482, region, x, y, dir);
+            chest.IsTouchable = true; // Works for now
+            WorldManager.Instance.AddProp(chest);
+            return chest;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void Succeed()
+        {
+            this.Complete(true);
+        }
+
+        public void Fail()
+        {
+            this.Complete(false);
         }
     }
 

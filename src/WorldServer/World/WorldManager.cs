@@ -1220,7 +1220,7 @@ namespace Aura.World.World
 				creature.CauseOfDeath = DeathCauses.Mob;
 		}
 
-		public void CreatureCompletesQuest(MabiCreature creature, MabiQuest quest, bool rewards)
+		public void CreatureCompletesQuest(MabiCreature creature, MabiQuest quest, bool rewards, bool clearQuest = true)
 		{
 			if (rewards)
 			{
@@ -1277,7 +1277,8 @@ namespace Aura.World.World
 			Send.ItemInfo(creature.Client, creature, quest.QuestItem);
 
 			// Remove from quest log.
-			creature.Client.Send(new MabiPacket(Op.QuestClear, creature.Id).PutLong(quest.Id));
+            if(clearQuest)
+			    creature.Client.Send(new MabiPacket(Op.QuestClear, creature.Id).PutLong(quest.Id));
 		}
 
 		public void AddParty(MabiParty party)

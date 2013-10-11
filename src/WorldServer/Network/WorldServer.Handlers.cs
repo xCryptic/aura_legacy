@@ -3436,12 +3436,19 @@ namespace Aura.World.Network
             uint classId = packet.GetInt();
             byte difficulty = packet.GetByte();
 
-            // Temp check for now, if it's really a SM
-            if (classId < 700000 || classId >= 800000)
+            // Temporary until quest.Type is loaded from database
+            if (player.GetQuestOrNull(classId) != null)
             {
-                Send.MissionAcceptR(creature, false, "The quest requested is not a Shadow Mission");
+                Send.MissionAcceptR(creature, false, "You already have this quest");
                 return;
             }
+
+            // Temp check for now, if it's really a SM
+            //if (classId < 700000 || classId >= 800000)
+            //{
+            //    Send.MissionAcceptR(creature, false, "The quest requested is not a Shadow Mission");
+            //    return;
+            //}
 
             var sm = MissionManager.Instance.GetShadowMissionInfo(classId);
             if (sm == null)
@@ -3459,7 +3466,7 @@ namespace Aura.World.Network
             }
 
             // Generate quest for user
-            var quest = sm.GenerateQuestOrNull(creature, difficulty);
+            var quest = sm.GenerateQuestOrNull(creature, difficulty, false);
             if (quest == null)
             {
                 // Throw exception?

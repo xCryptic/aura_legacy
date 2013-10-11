@@ -33,7 +33,7 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 		SupportDifficulty(Difficulty.Basic);
 		
 		// Difficulty, Exp, Gold
-		SetReward(Difficulty.Basic, 0, 2); // 2 whole gold, don't spend it all in one place
+		SetReward(Difficulty.Basic, 10, 2); // 2 whole gold, don't spend it all in one place
 		
 		// TODO: Should use [0] as default spawn
 		SetSpawn(0, 8874, 6802); // Player 1
@@ -121,17 +121,21 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 		//SpawnOrb(tempRegion, 8852, 8964, orb => { Complete(mission); });
 		
 		// Positions for each orb
+		// Todo: Make PositionsGrid, PositionsCircle
 		var positions = Positions(
 				8852, 8764,
 				8852, 8964,
 				8852, 9164,
 				8652, 8764,
 				8652, 8964,
-				8652, 9164
+				8652, 9164,
+				9052, 8764,
+				9052, 8964,
+				9052, 9164
 			);
 		
 		// Spawn the orb group
-		var group = SpawnBlinkingOrbGroup(tempRegion, positions, orb => { Complete(mission); }, 3000); // Auto-adds to disposables?
+		var group = SpawnBlinkingOrbGroup(tempRegion, positions, g => { Complete(mission); g.Dispose(); }, 3000); // Auto-adds to disposables?
 		
 		SetMarkers(mission, group); // To activate orbs and make them hittable, they must be set as markers
 		

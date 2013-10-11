@@ -83,13 +83,6 @@ namespace Aura.World.Network
 			//packet.PutString("QMBEXP:f:1.000000;QMBGLD:f:1.000000;QMSMEXP:f:1.000000;QMSMGLD:f:1.000000;QMAMEXP:f:1.000000;QMAMGLD:f:1.000000;QMBHDCTADD:4:0;QMGNRB:f:1.000000;QMGNRB:f:1.000000;");
             packet.PutString((quest.Tags == null ? MabiQuest.DefaultTags().ToString() : quest.Tags.ToString()));
 
-            // These aren't in (shadow?) missions, so.. simple check for now
-            if (quest.Info.Type != 7)
-            {
-                packet.PutInt(0);
-                packet.PutInt(0);
-            }
-
 			// Alternative, PTJ
 			//020 [........00000002] Int    : 2
 			//021 [........0000000C] Int    : 12
@@ -97,8 +90,12 @@ namespace Aura.World.Network
 			//023 [........00000015] Int    : 21
 			//024 [000039BF89671150] Long   : 63494806770000 // Timestamp
 
+            // These aren't in (shadow?) missions, so.. simple check for now
             if (quest.Info.Type != 7)
             {
+                packet.PutInt(0);
+                packet.PutInt(0);
+
                 packet.PutSInt(quest.Info.Objectives.Count);
                 foreach (DictionaryEntry de in quest.Info.Objectives)
                 {
