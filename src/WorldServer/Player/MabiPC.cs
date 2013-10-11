@@ -151,9 +151,12 @@ namespace Aura.World.Player
 
         public MabiQuest GetShadowMissionQuestOrNull()
         {
-            var quests = this.GetQuests(700000, 702000, 1); // Make this class range flexible?
-            if (quests.Length == 0) return null;
-            else return quests[0];
+            // Much better idea, just check Info.Type
+            return this.Quests.Values.FirstOrDefault(q => q.Info.Type == 7);
+
+            //var quests = this.GetQuests(700000, 702000, 1); // Make this class range flexible?
+            //if (quests.Length == 0) return null;
+            //else return quests[0];
         }
 	}
 }

@@ -146,10 +146,16 @@ namespace Aura.World.World
             }
         }
 
+        /// <summary>
+        /// Remove a mission and release its region Ids from
+        /// the Id pool. This should be called by a mission instance
+        /// when preparing to dispose.
+        /// </summary>
+        /// <param name="sm">Mission to remove/cleanup</param>
         public void EndShadowMission(MabiMission sm)
         {
-            sm.Close();
-            _shadowMissionInstances.Remove(sm.StartingRegion.Id);
+            //_shadowMissionInstances.Remove(sm.StartingRegion.Id);
+            this.RemoveMission(sm);
 
             // Remove from pool
             // Assumes thread safety regarding sm.Regions
@@ -291,12 +297,20 @@ namespace Aura.World.World
             return mission;
         }
 
+        /// <summary>
+        /// Remove a mission instance.
+        /// </summary>
+        /// <param name="regionId">Starting region Id of mission to remove</param>
         public void RemoveMission(uint regionId)
         {
             lock (_shadowMissionInstances)
                 _shadowMissionInstances.Remove(regionId);
         }
 
+        /// <summary>
+        /// Removes a mission instance.
+        /// </summary>
+        /// <param name="mission">Mission to remove</param>
         public void RemoveMission(MabiMission mission)
         {
             this.RemoveMission(mission.Id);
@@ -337,6 +351,10 @@ namespace Aura.World.World
             }
         }
 
+        /// <summary>
+        /// Remove multiple players from their respective missions.
+        /// </summary>
+        /// <param name="players">Players to remove</param>
         public void RemovePlayersFromMission(IEnumerable<ulong> players)
         {
             foreach (ulong player in players)
@@ -345,6 +363,11 @@ namespace Aura.World.World
             }
         }
 
+        /// <summary>
+        /// Remove a player from a mission.
+        /// </summary>
+        /// <param name="playerId">Id of player to remove</param>
+        /// <returns>true if player found and removed, false if player not found</returns>
         public bool RemovePlayerFromMission(ulong playerId)
         {
             bool r = false;

@@ -258,5 +258,10 @@ namespace Aura.World.Scripting
             foreach (var orb in orbs.Orbs.Values)
                 mission.AddMarker(orb);
         }
+
+        public void AddDisposable(MabiMission mission, IDisposable disposable)
+        {
+            mission.AddDisposable(disposable);
+        }
     }
 }

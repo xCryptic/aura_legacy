@@ -603,10 +603,11 @@ namespace Aura.World.World
         public MissionInfo MissionInfo = null;
         //public uint RegionId = 0; // Of region instance
         public bool Completed = false;
+        public bool Failed { get; private set; }
 
         // Map player Ids to indices
-        private Dictionary<ulong, uint> _playerIndices = new Dictionary<ulong, uint>();
-        private Object _indicesLock = new Object();
+        //private Dictionary<ulong, uint> _playerIndices = new Dictionary<ulong, uint>();
+        //private Object _indicesLock = new Object();
 
         /// <summary>
         /// Pseudo-Id of this mission instance. Is just a wrapper for the
@@ -624,7 +625,7 @@ namespace Aura.World.World
         //public Dictionary<uint, Region> Regions = new Dictionary<uint, Region>();
         public MissionRegion[] Regions = new MissionRegion[0];
 
-        private uint _startingRegionId = 0;
+        //private uint _startingRegionId = 0;
 
         private byte _difficulty = (byte)(Difficulty.Basic);
 
@@ -639,19 +640,20 @@ namespace Aura.World.World
         private List<IDisposable> _disposables = new List<IDisposable>();
 
         // Only includes players, one per client, no pets
-        protected SortedDictionary<ulong, MabiCreature> _players = new SortedDictionary<ulong, MabiCreature>();
-        protected Object _playersLock = new Object();
+        //protected SortedDictionary<ulong, MabiCreature> _players = new SortedDictionary<ulong, MabiCreature>();
+        //protected Object _playersLock = new Object();
 
-        private SortedDictionary<ulong, MissionPlayer> __players
+        private SortedDictionary<ulong, MissionPlayer> _players
             = new SortedDictionary<ulong, MissionPlayer>();
 
-        private ReaderWriterLock __playersLock = new ReaderWriterLock();
+        private ReaderWriterLock _playersLock = new ReaderWriterLock();
 
         public uint PlayerCount
         {
             get { return (_players != null ? (uint)_players.Count : 0); }
         }
 
+        /*
         public void AddPlayer(MabiCreature c)
         {
             lock (_playersLock)
@@ -659,7 +661,6 @@ namespace Aura.World.World
                 _players.Add(c.Id, c);
             }
         }
-
         public MabiCreature GetPlayer(ulong creatureId)
         {
             MabiCreature c = null;
@@ -669,7 +670,6 @@ namespace Aura.World.World
             }
             return c;
         }
-
         public bool RemovePlayer(ulong creatureId)
         {
             bool r = false;
@@ -679,6 +679,7 @@ namespace Aura.World.World
             }
             return r;
         }
+        */
 
         /// <summary>
         /// Get the starting region instance that players spawn in when entering the mission.
@@ -691,11 +692,16 @@ namespace Aura.World.World
             }
         }
 
+        /// <summary>
+        /// All props that currently act as minimap markers.
+        /// </summary>
         private SortedDictionary<ulong, MabiProp> _markers
             = new SortedDictionary<ulong, MabiProp>();
 
-        private SortedDictionary<ulong, MissionStatus> _statuses
-            = new SortedDictionary<ulong, MissionStatus>();
+        //private SortedDictionary<ulong, MissionStatus> _statuses
+        //    = new SortedDictionary<ulong, MissionStatus>();
+
+        private Timer _timer = null;
 
         public MabiMission(uint regionId, MissionInfo info, Difficulty difficulty, ulong propId = 0)
             : this(new uint[] { regionId }, info, (byte)difficulty, propId)
@@ -724,15 +730,35 @@ namespace Aura.World.World
                 throw new Exception("Cannot start a Shadow Mission with an unsupported difficulty");
 
             this.MissionInfo = info;
-            _startingRegionId = regionIds[0];
             _difficulty = difficulty;
             _propId = propId;
+
+            // Start timer if time limit
+            this.Failed = false;
+            this.StartTimer(); // Put here for current lack of a better spot?
 
             this.InitRegions(regionIds);
 
             // Trigger script-defined callback
             if (this.MissionInfo.OnMissionStart != null)
                 this.MissionInfo.OnMissionStart(this);
+        }
+
+        /// <summary>
+        /// Start the timer, but if it is already started, nothing will happen (no reset).
+        /// </summary>
+        public void StartTimer()
+        {
+            _timer = new Timer(OnTimeUp, null, 0, this.MissionInfo.TimeLimit);
+        }
+
+        /// <summary>
+        /// Called by timer when time limit is exceeded.
+        /// </summary>
+        /// <param name="o"></param>
+        protected void OnTimeUp(object o)
+        {
+            this.Failed = true; // :(
         }
 
         /// <summary>
@@ -757,20 +783,125 @@ namespace Aura.World.World
 
         public void Complete(bool receiveRewards = false)
         {
-            lock (_playersLock)
+            _playersLock.AcquireReaderLock(-1);
+
+            foreach (var pair in _players)
             {
-                // Assuming only players..
-                foreach (var pair in _players)
-                {
-                    if (!(pair.Value is MabiPC)) continue;
-                    var player = pair.Value as MabiPC;
+                var mp = pair.Value;
+                if (mp == null || mp.Player == null) continue;
 
-                    var quest = player.GetShadowMissionQuestOrNull();
-                    if (quest == null) continue;
-
-                    WorldManager.Instance.CreatureCompletesQuest(player, quest, receiveRewards);
-                }
+                var quest = mp.Player.GetShadowMissionQuestOrNull();
+                if (quest == null) continue;
+                
+                WorldManager.Instance.CreatureCompletesQuest(mp.Player, quest, receiveRewards);
             }
+
+            _playersLock.ReleaseReaderLock();
+
+            //lock (_playersLock)
+            //{
+            //    // Assuming only players..
+            //    foreach (var pair in _players)
+            //    {
+            //        if (!(pair.Value is MabiPC)) continue;
+            //        var player = pair.Value as MabiPC;
+            //
+            //        var quest = player.GetShadowMissionQuestOrNull();
+            //        if (quest == null) continue;
+            //
+            //        WorldManager.Instance.CreatureCompletesQuest(player, quest, receiveRewards);
+            //    }
+            //}
+        }
+
+        public void AddMissionPlayer(MabiPC player, uint index)
+        {
+            this.AddMissionPlayer(new MissionPlayer(player, index));
+        }
+
+        public void AddMissionPlayer(MissionPlayer player)
+        {
+            _playersLock.AcquireWriterLock(-1); // LOCK
+
+            try { _players.Add(player.Player.Id, player); }
+            catch (ArgumentException) { }
+
+            _playersLock.ReleaseWriterLock(); // UNLOCK
+        }
+
+        public bool RemoveMissionPlayer(ulong playerId)
+        {
+            bool r = false;
+            _playersLock.AcquireWriterLock(-1); // LOCK
+            r = _players.Remove(playerId);
+            _playersLock.ReleaseWriterLock(); // UNLOCK
+            return r;
+        }
+
+        /// <summary>
+        /// Get the MissionPlayer (wrapper class) of a player in this mission.
+        /// Should be thread-safe enough for use in other GetX(...) functions.
+        /// </summary>
+        /// <param name="playerId">Id of player to get</param>
+        /// <returns>MissionPlayer wrapper class of player, or null if none</returns>
+        public MissionPlayer GetMissionPlayer(ulong playerId)
+        {
+            MissionPlayer mp = null;
+
+            _playersLock.AcquireReaderLock(-1); // LOCK
+            _players.TryGetValue(playerId, out mp);
+            _playersLock.ReleaseReaderLock(); // UNLOCK
+
+            return mp;
+        }
+
+        /// <summary>
+        /// Get a player in this mission.
+        /// </summary>
+        /// <param name="playerId">Id of player to get</param>
+        /// <returns>Specified player, or null if none</returns>
+        public MabiPC GetPlayer(ulong playerId)
+        {
+            var player = this.GetMissionPlayer(playerId);
+            return (player != null ? player.Player : null);
+        }
+
+        /// <summary>
+        /// Get the status of a player in this mission.
+        /// </summary>
+        /// <param name="playerId">Id of player whose status to get</param>
+        /// <returns>Status of specified player, or MissionStatus.None if none</returns>
+        public MissionStatus GetPlayerStatus(ulong playerId)
+        {
+            var player = this.GetMissionPlayer(playerId);
+            return (player != null ? player.Status : MissionStatus.None);
+        }
+
+        /// <summary>
+        /// Get the index of a specific player relative to this mission.
+        /// </summary>
+        /// <param name="playerId">Player to get index of</param>
+        /// <returns>Index of player, or uint.MaxValue if none</returns>
+        public uint GetPlayerIndex(ulong playerId)
+        {
+            var player = this.GetMissionPlayer(playerId);
+            return (player != null ? player.Index : uint.MaxValue);
+        }
+
+        /// <summary>
+        /// Get the player at a specified index.
+        /// </summary>
+        /// <param name="index">Index of player to get</param>
+        /// <returns>Player at index, or null if none</returns>
+        public MabiPC GetPlayerAtIndex(uint index)
+        {
+            MissionPlayer player = null;
+
+            _playersLock.AcquireReaderLock(-1); // LOCK
+            player = _players.Values.First(x => x.Index == index);
+            _playersLock.ReleaseReaderLock(); // UNLOCK
+
+            return player.Player;
         }
 
         /// <summary>
@@ -781,36 +912,35 @@ namespace Aura.World.World
             get { return this._players.Count == 0; }
         }
 
+        /// <summary>
+        /// Set the status of a player.
+        /// </summary>
+        /// <param name="playerId">Id of player</param>
+        /// <param name="status">Status to set player to</param>
         public void SetPlayerStatus(ulong playerId, MissionStatus status)
         {
-            lock (_statuses)
-            {
-                if (_statuses.ContainsKey(playerId))
-                    _statuses[playerId] = status;
-                else _statuses.Add(playerId, status);
-            }
+            var mp = this.GetMissionPlayer(playerId);
+            if (mp != null) mp.Status = status;
+
+            //lock (_statuses)
+            //{
+            //    if (_statuses.ContainsKey(playerId))
+            //        _statuses[playerId] = status;
+            //    else _statuses.Add(playerId, status);
+            //}
         }
 
-        public MissionStatus GetPlayerStatus(MabiPC player)
-        {
-            return this.GetPlayerStatus(player.Id);
-        }
-
-        public MissionStatus GetPlayerStatus(ulong playerId)
-        {
-            MissionStatus status = MissionStatus.None;
-            lock (_statuses)
-                _statuses.TryGetValue(playerId, out status);
-            return status;
-        }
-
+        /// <summary>
+        /// Dispose of this mission, and remove it from the MissionManager.
+        /// </summary>
         public virtual void Dispose()
         {
             lock (_disposables)
                 foreach (var d in _disposables)
                     d.Dispose();
 
-            MissionManager.Instance.RemoveMission(this);
+            //MissionManager.Instance.RemoveMission(this);
+            MissionManager.Instance.EndShadowMission(this);
         }
 
         /// <summary>
@@ -842,7 +972,7 @@ namespace Aura.World.World
         /// Add this mission's prop markers to a packet.
         /// TODO: Make this a Send function.
         /// </summary>
-        /// <param name="packet"></param>
+        /// <param name="packet">Packet to add to</param>
         public void AddMarkersToPacket(MabiPacket packet)
         {
             lock (_markers)
@@ -912,34 +1042,14 @@ namespace Aura.World.World
             }
         }
 
-        public void AddPlayerIndex(ulong creatureId, uint index)
-        {
-            lock (_indicesLock)
-            {
-                try { _playerIndices.Add(creatureId, index); }
-                catch { }
-            }
-        }
-
-        public uint GetPlayerIndex(ulong creatureId)
-        {
-            uint r = uint.MaxValue;
-            lock (_indicesLock)
-            {
-                _playerIndices.TryGetValue(creatureId, out r);
-            }
-            return r;
-        }
-
-        public bool RemovePlayerIndex(ulong creatureId)
-        {
-            bool r = false;
-            lock (_indicesLock)
-            {
-                r = _playerIndices.Remove(creatureId);
-            }
-            return r;
-        }
+        //public void AddPlayerIndex(ulong creatureId, uint index)
+        //{
+        //    lock (_indicesLock)
+        //    {
+        //        try { _playerIndices.Add(creatureId, index); }
+        //        catch { }
+        //    }
+        //}
 
         /// <summary>
         /// Have a user/creature enter the shadow mission.
@@ -952,6 +1062,8 @@ namespace Aura.World.World
             // User
             if (!(player.Client is WorldClient)) return;
             var client = player.Client as WorldClient;
+
+            var mp = new MissionPlayer(player, playerIndex);
 
             // Send AreaChange
             // Not sure how this acts when no prop was used to trigger mission
@@ -1023,7 +1135,8 @@ namespace Aura.World.World
 
             // Add player to indices dictionary, will use for now as "proof" that they
             // are a part of this SM..
-            this.AddPlayerIndex(player.Id, playerIndex);
+            //this.AddPlayerIndex(player.Id, playerIndex);
+            this.AddMissionPlayer(mp);
             
             //client.ShadowMission = this;
             //client.ShadowMissionStatus = ShadowMissionStatus.Entering;
@@ -1048,7 +1161,7 @@ namespace Aura.World.World
         {
             bool a = false;
             lock (_players)
-                a = _playerIndices.ContainsKey(id);
+                a = _players.ContainsKey(id);
             return a;
         }
 
@@ -1138,8 +1251,6 @@ namespace Aura.World.World
             unkPacket.PutInt(0);
             client.Send(unkPacket);
 
-
-
             // Send an 0xA97F.. 10 seconds after region info sent? (Id: Broadcast)
             // Format: { (uint) # of regions, (uint)regionId1, (uint)regionId2, ... }
 
@@ -1199,17 +1310,13 @@ namespace Aura.World.World
             if (!(player.Client is WorldClient)) return;
             var client = player.Client as WorldClient;
 
-            if (!this.RemovePlayerIndex(client.Character.Id)) // This is thread safe
+            if (!this.RemoveMissionPlayer(client.Character.Id)) // This is thread safe
             {
                 // They were recently removed from SM, might be request spamming
                 return;
             }
-
-            this.RemovePlayer(client.Character.Id);
-
-            // [#TEMPORARY]
-            //client.ClearShadowMission();
-            //client.ShadowMissionStatus = ShadowMissionStatus.None;
+            
+            // Remove from MissionManager
             MissionManager.Instance.RemovePlayerFromMission(player.Id);
 
             // Remove SM quest
@@ -1219,15 +1326,6 @@ namespace Aura.World.World
                 player.Quests.Remove(quest.Class);
                 WorldManager.Instance.CreatureCompletesQuest(player, quest, false); // Trying this..
             }
-        }
-
-        /// <summary>
-        /// Close the Shadow Mission instance, called after all users have (left region/received reward/completed mission).
-        /// Not sure when the best time to close it is yet, need more research.
-        /// </summary>
-        public void Close()
-        {
-            // TODO
         }
 
         public List<MabiProp> GetProps()
@@ -1242,8 +1340,6 @@ namespace Aura.World.World
             }
             return props;
         }
-
-        
     }
 
     /// <summary>
@@ -1274,9 +1370,9 @@ namespace Aura.World.World
     {
         public MabiPC Player = null;
         public MissionStatus Status = MissionStatus.None;
-        public byte Index = 0;
+        public uint Index = 0;
 
-        public MissionPlayer(MabiPC player, byte index)
+        public MissionPlayer(MabiPC player, uint index)
         {
             this.Player = player;
             this.Index = index;

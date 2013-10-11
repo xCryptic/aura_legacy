@@ -134,5 +134,10 @@ public class PunchOrbsGetPaidScript : ShadowMissionScript
 		var group = SpawnBlinkingOrbGroup(tempRegion, positions, orb => { Complete(mission); }, 3000); // Auto-adds to disposables?
 		
 		SetMarkers(mission, group); // To activate orbs and make them hittable, they must be set as markers
+		
+		// Temporary solution for disposable classes that are disposed along
+		// with the mission being disposed. A better solution requires region
+		// instances, but this works for now
+		AddDisposable(mission, group);
 	}
 }

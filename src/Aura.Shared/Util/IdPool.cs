@@ -70,7 +70,7 @@ namespace Aura.Shared.Util
 
             lock (_lock)
             {
-                _inUse[val] = false;
+                _inUse[(val - _start)] = false;
 
                 // Set current pointer to this released val
                 if (val < _currentUnused)
