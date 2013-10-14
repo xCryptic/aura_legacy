@@ -2,11 +2,13 @@
 // For more information, see licence.txt in the main folder
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Aura.Data;
 using Aura.World.World;
+using Aura.Shared.Util;
 
 namespace Aura.World.Scripting
 {
@@ -16,6 +18,11 @@ namespace Aura.World.Scripting
     public class ShadowMissionScript : MissionScript
     {
         public MissionInfo MissionInfo = new MissionInfo();
+
+        public IEnumerator GetEnumerator(MabiMission mission)
+        {
+            return this.Continue(mission).GetEnumerator();
+        }
 
         public void AddToQuest()
         {
@@ -61,11 +68,19 @@ namespace Aura.World.Scripting
         {
             // Add to QuestInfo database
             this.AddToQuest();
+
+            // Set script
+            this.MissionInfo.Script = this;
         }
 
-        protected void HookMissionStart(MabiMission.Callback callback)
+        //protected void HookMissionStart(MabiMission.Callback callback)
+        //{
+        //    this.MissionInfo.OnMissionStart = callback;
+        //}
+
+        protected void HookMissionStart(IEnumerable e)
         {
-            this.MissionInfo.OnMissionStart = callback;
+            this.MissionInfo.Callback = e;
         }
 
         public void SetClass(uint classId)

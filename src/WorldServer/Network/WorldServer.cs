@@ -109,6 +109,11 @@ namespace Aura.World.Network
 			Logger.Info("Loading data files...");
 			ServerUtil.LoadData(WorldConf.DataPath);
 
+            // Named spawns
+            // --------------------------------------------------------------
+            Logger.Info("Loading named spawns...");
+            Spawner.Load(WorldConf.DataPath);
+
 			// Guilds
 			// --------------------------------------------------------------
 			Logger.Info("Loading guilds...");

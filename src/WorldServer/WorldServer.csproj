@@ -139,6 +139,7 @@
     <Compile Include="Skills\SkillHandler.cs" />
     <Compile Include="Skills\SkillHelper.cs" />
     <Compile Include="Skills\SkillManager.cs" />
+    <Compile Include="Util\Positions.cs" />
     <Compile Include="Util\Spawner.cs" />
     <Compile Include="Util\WorldConf.cs" />
     <Compile Include="World\CommandHandler.cs" />

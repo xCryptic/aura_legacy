@@ -2,6 +2,7 @@
 // For more information, see licence.txt in the main folder
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -134,12 +135,22 @@ namespace Aura.World.World
         /// Function called when starting the mission. Usually set by
         /// script function HookMissionStart()
         /// </summary>
-        public MabiMission.Callback OnMissionStart = null;
+        //public MabiMission.Callback OnMissionStart = null;
 
         /// <summary>
         /// Function called when a mission's time limit is expired.
         /// </summary>
-        public MabiMission.Callback OnTimeOut = null;
+        //public MabiMission.Callback OnTimeOut = null;
+
+        /// <summary>
+        /// Script that was used to initialize this mission info.
+        /// </summary>
+        public MissionScript Script = null;
+
+        /// <summary>
+        /// Mission start callback
+        /// </summary>
+        public IEnumerable Callback = null;
 
         // Arg 1, class Id
         // public uint Class = 0;
@@ -601,7 +612,8 @@ namespace Aura.World.World
     /// </summary>
     public class MabiMission : IDisposable
     {
-        public delegate void Callback(MabiMission mission);
+        public delegate System.Collections.IEnumerable Callback(MabiMission mission);
+        //public delegate System.Collections.IEnumerable Callback(MabiMission mission);
 
         public MissionInfo MissionInfo = null;
         //public uint RegionId = 0; // Of region instance
@@ -743,8 +755,21 @@ namespace Aura.World.World
             this.InitRegions(regionIds);
 
             // Trigger script-defined callback
-            if (this.MissionInfo.OnMissionStart != null)
-                this.MissionInfo.OnMissionStart(this);
+            //if (this.MissionInfo.OnMissionStart != null)
+            //    this.MissionInfo.OnMissionStart(this);
+            this.Continue();
+        }
+
+        private IEnumerator _enumerator = null;
+        public void Continue()
+        {
+            Logger.Info("Continue?");
+            if(_enumerator == null)
+                _enumerator = this.MissionInfo.Script.Continue(this).GetEnumerator();
+            _enumerator.MoveNext();
+
+            //if (this.MissionInfo.OnMissionStart != null)
+            //    this.MissionInfo.OnMissionStart(this);
         }
 
         /// <summary>
@@ -1389,6 +1414,39 @@ namespace Aura.World.World
             this.Index = index;
         }
     }
+
+    /*
+    public abstract class MissionEnumerator
+    {
+        public MabiMission Mission = null;
+
+        public MissionEnumerator(MabiMission mission)
+        {
+            this.Mission = mission;
+        }
+
+        public abstract System.Collections.IEnumerable Continue();
+    }
+
+    /// <summary>
+    /// Move to scripts after testing.
+    /// </summary>
+    public class POGPMissionEnumerator : MissionEnumerator
+    {
+        public POGPMissionEnumerator(MabiMission mission)
+            : this(mission)
+        {
+
+        }
+
+        public override System.Collections.IEnumerable Continue()
+        {
+            yield return false;
+            yield return true;
+            yield return false;
+        }
+    }
+    */
 
     // These are going to need to be dynamically altered somehow..
     // Will need thread safety

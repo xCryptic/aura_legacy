@@ -1,0 +1,14 @@
+// Types:
+// P = Point, one point)
+// L = Line, two points
+// R = Rectangle, four points
+// Y = Polygon, N points
+
+// Points
+// Type,Name,X1,Y1
+P,room_middle_orig,8852,8964
+
+// Lines
+// Type,Name,X1,Y1,X2,Y2
+L,room_spawn_region,8652,8764,9052,9164
+

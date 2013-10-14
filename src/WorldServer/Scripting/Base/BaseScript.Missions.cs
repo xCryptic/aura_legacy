@@ -33,12 +33,17 @@ namespace Aura.World.Scripting
             MissionManager.Instance.AddShadowMissionAltar(propId, regionId, x, y);
         }
 
+        public MabiOrbProp SpawnOrb(uint regionId, Point point, OrbHitCallback callback)
+        {
+            return this.SpawnOrb(regionId, point.X, point.Y, callback);
+        }
+
         public MabiOrbProp SpawnOrb(uint regionId, uint x, uint y, OrbHitCallback callback)
         {
             // Note: Color2 is orb color, all others are default (do nothing probably)
             MabiOrbProp orb = new MabiOrbProp(regionId, x, y, callback); // Hardcoded for now
             orb.IsOn = true;
-
+            
             // These might not be constant.. check more orbs
             //orb.Info.__unknown65 = 0x31;
             //orb.Info.__unknown66 = 0x2C;
@@ -108,6 +113,25 @@ namespace Aura.World.Scripting
 
             return group;
         }
+
+        public BlinkingOrbGroup SpawnStarOrbGroup(uint regionId, uint cx, uint cy, double radius, double dir,
+            OrbGroupCompleteCallback callback = null, uint deltaTime = 10000, uint maxEnabled = 0, OrbHitCallback badOrb = null)
+        {
+            var positions = Aura.World.Util.Positions.Circle(cx, cy, radius, dir, 5);
+            var orbs = new List<MabiOrbProp>();
+            foreach (var pair in positions)
+            {
+                var orb = this.SpawnOrb(regionId, (uint)pair.Item1, (uint)pair.Item2, null);
+                orb.Info.Color2 = 0xFFF0F0F0; // White-ish
+                orbs.Add(orb);
+            }
+            return this.SpawnBlinkingOrbGroup(regionId, orbs, callback, deltaTime, maxEnabled, badOrb);
+        }
+
+        public void RemoveProp(MabiProp prop)
+        {
+            WorldManager.Instance.RemoveProp(prop);
+        }
     }
 }
 
@@ -164,6 +188,8 @@ namespace Aura.World.World
 
         public override void Dispose()
         {
+            // Note from experience: Don't fucking call RemoveProp here
+
             this.RemoveEvent(); // If it's registered
             base.Dispose();
         }
@@ -193,6 +219,30 @@ namespace Aura.World.World
             this.OnHit(this);
         }
     }
+
+    /*
+    public class CircleOrbProp : MabiOrbProp
+    {
+        private MabiProp _circleProp = null;
+
+        /// <summary>
+        /// Add the status of the circle on the ground to packet..? Seems similar
+        /// to a prop update, packet with Op 0x52DB.
+        /// </summary>
+        /// <param name="packet">Packet to add to</param>
+        public void AddCircleStatusToPacket(MabiPacket packet)
+        {
+            if (_circleProp == null) return;
+
+            packet.PutInt(2)
+                  .PutInt(_circleProp.Region)
+                  .PutFloat(_circleProp.Info.X)
+                  .PutFloat(_circleProp.Info.Y)
+                  .PutFloat(1f) // ?
+                  .PutString(_circleProp.State); // default, changed1, changed2, completed
+        }
+    }
+    */
 
     public abstract class MabiOrbGroup : IDisposable
     {
@@ -310,6 +360,8 @@ namespace Aura.World.World
     // TODO: Investigate packets and see what needs to be done/sent
     //    }
     //}
+
+
 
     public class BlinkingOrbGroup : MabiOrbGroup
     {

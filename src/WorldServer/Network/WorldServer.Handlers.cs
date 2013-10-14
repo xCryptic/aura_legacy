@@ -3436,6 +3436,14 @@ namespace Aura.World.Network
             uint classId = packet.GetInt();
             byte difficulty = packet.GetByte();
 
+            // Currently unimplemented (recruitment notice):
+            bool hasRNotice = packet.GetBool(); // recruitment notice
+            if (hasRNotice)
+            {
+                string rnIntro = packet.GetString();
+                string rnRawPass = packet.GetString();
+            }
+
             // Temporary until quest.Type is loaded from database
             if (player.GetQuestOrNull(classId) != null)
             {
