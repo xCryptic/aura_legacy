@@ -99,6 +99,83 @@ namespace Aura.World.World
         }
     }
 
+    /// <summary>
+    /// A listing of parties created upon shadow mission party creation, when using
+    /// the "Register Recruitment Notice" checkbox.
+    /// 
+    /// One party listing is shared with both Tara and Tail boards; However, upon
+    /// leader changing channels, the entry disappears (seems bound to channel the
+    /// party was created on).
+    /// 
+    /// It seems parties disappear from the list after a certain time period, maybe
+    /// 3 minutes or somewhere around there. Needs testing, for now keep until party
+    /// is disbanded or enters a mission.
+    /// </summary>
+    public class MissionPartyListing
+    {
+        private SortedDictionary<ulong, MabiParty> _parties
+            = new SortedDictionary<ulong, MabiParty>();
+
+        public MissionPartyListing()
+        {
+            // Todo: Add PartyDisband event listener, remove from _parties
+        }
+
+        public List<MabiParty> List
+        {
+            get
+            {
+                List<MabiParty> list = new List<MabiParty>();
+
+                lock (_parties)
+                {
+                    //list = _parties.Values.ToList();
+                    List<ulong> removeList = new List<ulong>();
+                    foreach (var pair in _parties)
+                    {
+                        var party = pair.Value;
+
+                        // Check if party should be displayed
+                        if (party != null && WorldManager.Instance.GetParty(party.Id) != null)
+                            list.Add(party);
+                        else removeList.Add(party.Id);
+                    }
+
+                    // Remove all in removeList
+                    foreach (ulong id in removeList)
+                        _parties.Remove(id);
+                }
+
+                return list;
+            }
+        }
+
+        public void Add(MabiParty party)
+        {
+            lock (_parties)
+            {
+                if (_parties.ContainsKey(party.Id))
+                    _parties[party.Id] = party; // Overwrite
+                else _parties.Add(party.Id, party);
+            }
+        }
+
+        public bool Remove(MabiParty party)
+        {
+            return this.Remove(party.Id);
+        }
+
+        public bool Remove(ulong partyId)
+        {
+            bool r = false;
+            lock (_parties)
+            {
+                r = _parties.Remove(partyId);
+            }
+            return r;
+        }
+    }
+
     /***
      * Replaced with Quest reward
      ***
@@ -754,6 +831,9 @@ namespace Aura.World.World
 
             this.InitRegions(regionIds);
 
+            // Temp. fix until player instances can have their own events
+            Events.EventManager.PlayerEvents.PlayerLoggedOff += OnPlayerLoggedOff;
+
             // Trigger script-defined callback
             //if (this.MissionInfo.OnMissionStart != null)
             //    this.MissionInfo.OnMissionStart(this);
@@ -959,6 +1039,9 @@ namespace Aura.World.World
                 foreach (var d in _disposables)
                     d.Dispose();
 
+            // Remove PlayerLoggedOff callback
+            Events.EventManager.PlayerEvents.PlayerLoggedOff -= OnPlayerLoggedOff;
+
             //MissionManager.Instance.RemoveMission(this);
             MissionManager.Instance.EndShadowMission(this);
         }
@@ -1032,9 +1115,7 @@ namespace Aura.World.World
                 spawnX -= 163;
                 spawnY -= 156;
             }
-
-            //var regionsInfo = ;
-
+            
             //packet.PutInt(this.RegionUnknown1); // 0, 300, ?
             packet.PutInt(this.MissionInfo.MapRegion); // For now just put MapRegion, but sends 0 sometimes as well?
 
@@ -1292,9 +1373,14 @@ namespace Aura.World.World
             // Client also sends a 0xA90B request around now, server responds
             // with 0xA90C, seems to contain data/positions of next wave of monsters?
             
+            // If in a party, and is the leader, remove party from listing
+            if (player.Party != null && player.Party.Leader.Id == player.Id)
+                MissionManager.Instance.PartyListing.Remove(player.Party);
+            
+            // Update player's mission status
             this.SetPlayerStatus(player.Id, MissionStatus.In);
-
-            Events.EventManager.PlayerEvents.PlayerLoggedOff += OnPlayerLoggedOff;
+            
+            // TODO: Add OnPlayerLoggedOff event for individual player, whenever those exist
         }
 
         /// <summary>

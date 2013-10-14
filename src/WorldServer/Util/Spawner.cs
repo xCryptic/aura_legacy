@@ -207,7 +207,7 @@ namespace Aura.World.Util
                 }
             }
 
-            Logger.Info("Read " + eCount + " named spawns from " + fCount + " files");
+            Logger.Info("Done loading " + eCount + " named spawns from " + fCount + " file(s)");
         }
 
         /// <summary>

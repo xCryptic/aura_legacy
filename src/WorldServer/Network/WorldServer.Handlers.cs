@@ -159,6 +159,7 @@ namespace Aura.World.Network
             this.RegisterPacketHandler(Op.ShadowMissionMap, HandleShadowMissionMap);
             this.RegisterPacketHandler(Op.ShadowMissionAccept, HandleShadowMissionAccept);
             this.RegisterPacketHandler(Op.ShadowMissionExit, HandleShadowMissionExit);
+            this.RegisterPacketHandler(Op.ShadowMissionParties, HandleShadowMissionParties);
             this.RegisterPacketHandler(0xA90B, HandleMinimapPropMarkers);
 
 			// Temp/Unknown
@@ -215,12 +216,6 @@ namespace Aura.World.Network
 				// there are items equipped on that set.
 				// Also sent when pressing ESC?
 			});
-
-            this.RegisterPacketHandler(Op.ShadowMissionUnk, (client, packet) =>
-            {
-                // Unsure what this is for, got it while checking SM board?
-                client.Send(new MabiPacket(Op.ShadowMissionUnkR, packet.Id).PutInt(0));
-            });
 		}
 
 		private void HandleLogin(WorldClient client, MabiPacket packet)
@@ -3438,10 +3433,11 @@ namespace Aura.World.Network
 
             // Currently unimplemented (recruitment notice):
             bool hasRNotice = packet.GetBool(); // recruitment notice
+            string rnIntro = null, rnRawPass = null;
             if (hasRNotice)
             {
-                string rnIntro = packet.GetString();
-                string rnRawPass = packet.GetString();
+                rnIntro = packet.GetString();
+                rnRawPass = packet.GetString();
             }
 
             // Temporary until quest.Type is loaded from database
@@ -3503,6 +3499,32 @@ namespace Aura.World.Network
                 .PutByte(0);
             client.Send(questUpdate);
 
+            // Start party, on official servers this is done before handling the SM quest
+            // TODO: Add a feature to enable/disable this behaviour
+            // HandlePartyCreate mirrors a lot of this
+            if (sm.PartyCountMax > 1)
+            {
+                var party = new MabiParty(player);
+                party.Name = (rnIntro != null ? rnIntro : "Shadow Mission party"); // TODO: Default party name
+                party.Password = (rnRawPass != null ? rnRawPass : "");
+                party.MaxSize = sm.PartyCountMax;
+
+                player.Party = party;
+                
+                // Mostly copied from HandlePartyCreate
+                // --
+                WorldManager.Instance.AddParty(party);
+                var p = new MabiPacket(Op.PartyCreateR, creature.Id).PutByte(1);
+                creature.Party.AddPartyPacket(p);
+                creature.Client.Send(p);
+                WorldManager.Instance.PartyMemberWantedShow(party);
+                // --
+
+                // Add to party listing
+                if(hasRNotice)
+                    MissionManager.Instance.PartyListing.Add(party);
+            }
+
             // Placeholder function name:
             // if(CanPartakeInShadowMission(creature, classId, difficulty))
             {
@@ -3527,6 +3549,22 @@ namespace Aura.World.Network
 
             // Exit will need thread safety/locking..
             // Otherwise Exit request spamming could cause problems
+        }
+
+        /// <summary>
+        /// Send a list of active shadow mission parties to the client. This can be resource
+        /// intensive, original client tries to limit requests so they can't be spammed, maybe
+        /// add some check per client so they only get a (real) response once per N seconds.
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="packet"></param>
+        private void HandleShadowMissionParties(WorldClient client, MabiPacket packet)
+        {
+            if (client.Character == null) return;
+            var player = client.Character as MabiPC;
+
+            var partyList = MissionManager.Instance.PartyListing.List;
+            Send.MissionPartyListR(client.Character, partyList);
         }
 
         private void HandleMinimapPropMarkers(WorldClient client, MabiPacket packet)

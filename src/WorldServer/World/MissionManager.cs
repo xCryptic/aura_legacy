@@ -36,6 +36,16 @@ namespace Aura.World.World
         /// </summary>
         private SortedDictionary<ulong, MabiMission> _smUsers
             = new SortedDictionary<ulong, MabiMission>();
+        
+        /// <summary>
+        /// Party listing, seems to be one per channel, shared between Tara and Tail?
+        /// </summary>
+        private MissionPartyListing _smParties = new MissionPartyListing();
+
+        public MissionPartyListing PartyListing
+        {
+            get { return _smParties; }
+        }
 
         /// <summary>
         /// Singleton constructor

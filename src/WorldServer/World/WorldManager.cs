@@ -1293,6 +1293,14 @@ namespace Aura.World.World
 				_parties.Remove(party);
 		}
 
+        public MabiParty GetParty(ulong partyId)
+        {
+            MabiParty party = null;
+            lock (_parties)
+                party = _parties.FirstOrDefault(x => x.Id == partyId);
+            return party;
+        }
+
 		public void CreatureLeaveParty(MabiCreature creature)
 		{
 			if (creature.Client == null || creature.Party == null)

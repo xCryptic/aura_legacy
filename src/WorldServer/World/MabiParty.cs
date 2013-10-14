@@ -27,6 +27,11 @@ namespace Aura.World.World
 		public bool IsOpen = false;
 
 		private ulong _id;
+        public ulong Id
+        {
+            get { return _id; }
+        }
+
 		private static ulong _worldPartyIndex = Aura.Shared.Const.Id.Parties;
 		public static ulong NewPartyId { get { return _worldPartyIndex++; } }
 

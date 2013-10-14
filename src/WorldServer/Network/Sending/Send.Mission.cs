@@ -5,12 +5,13 @@ using System.Text;
 using Aura.Shared.Network;
 using Aura.World.World;
 using Aura.Data;
+using Aura.World.Player;
 
 namespace Aura.World.Network
 {
     public static partial class Send
     {
-        public static void AddMissionList(this MabiPacket packet, MissionBoard board, byte difficulty)
+        private static void AddMissionList(this MabiPacket packet, MissionBoard board, byte difficulty)
         {
             // Even if difficulty not supported, add difficulty to packet
             // Otherwise client will rapid request, this way it thinks empty list
@@ -28,7 +29,7 @@ namespace Aura.World.Network
             }
         }
 
-        public static void AddMissionInfo(this MabiPacket packet, MissionInfo info, byte difficulty)
+        private static void AddMissionInfo(this MabiPacket packet, MissionInfo info, byte difficulty)
         {
             if (!info.SupportsDifficulty(difficulty)) throw new Exception(
                 String.Format("Difficulty {1} unsupported for mission {0}", info.Class, difficulty));
@@ -62,7 +63,7 @@ namespace Aura.World.Network
             packet.PutByte(info.Special); // Almost always 0, but have seen as 3? (The Other Alchemists = 3, Their Method = 1)
         }
 
-        public static void AddMissionMapData(this MabiPacket packet, MissionInfo info)
+        private static void AddMissionMapData(this MabiPacket packet, MissionInfo info)
         {
             // Op: 0x8D6C
             // First argument is a String which echos the String sent in request, so
@@ -91,6 +92,29 @@ namespace Aura.World.Network
             packet.PutByte(success);
             if (!success && msg != null)
                 packet.PutString(msg);
+            creature.Client.Send(packet);
+        }
+
+        public static void MissionPartyListR(MabiCreature creature, List<MabiParty> parties)
+        {
+            var packet = new MabiPacket(Op.ShadowMissionPartiesR, creature.Id);
+            packet.PutInt((uint)parties.Count);
+            foreach (var party in parties)
+            {
+                var leader = party.Leader as MabiPC;
+                var quest = leader.GetShadowMissionQuestOrNull();
+                if(quest == null) continue; // Must have a SM quest
+
+                packet.PutLong(party.Id)
+                      .PutLong(leader.Id)
+                      .PutString(leader.Name)
+                      .PutString(quest.Info.Name)
+                      .PutString(party.Name)
+                      .PutInt((uint)party.Members.Count)
+                      .PutInt(party.MaxSize);
+            }
+            packet.PutByte(1); // ??? Need to test with 2+ parties in list, might go in loop
+
             creature.Client.Send(packet);
         }
     }

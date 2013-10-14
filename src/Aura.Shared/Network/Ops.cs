@@ -418,19 +418,19 @@ namespace Aura.Shared.Network
 		public const uint Walking = 0x0FD13021;
 		public const uint Walk = 0x0FF23431;
 
-        public readonly static uint ShadowMissionMap = 0x8D6B;
-        public readonly static uint ShadowMissionMapR = 0x8D6C;
-        //public readonly static uint PartyQuestSomethingR = 0x8EB1; // Sent to client
-        //public readonly static uint PartyQuestSomethingR = 0x8EB4; // Sent to client
-        public readonly static uint ShadowMissionList = 0x8EBF;
-        public readonly static uint ShadowMissionListR = 0x8EC0;
-        public const uint ShadowMissionUnk = 0x8EC1;
-        public const uint ShadowMissionUnkR = 0x8EC2;
-        public readonly static uint ShadowMissionAccept = 0x8EC3;
-        public readonly static uint ShadowMissionAcceptR = 0x8EC4;
-        public readonly static uint ShadowMissionExit = 0xA90D;
-        public readonly static uint ShadowMissionExitR = 0xA90E;
-        public readonly static uint ShadowMissionRegionR = 0xA97E;
+        public const uint ShadowMissionMap = 0x8D6B;
+        public const uint ShadowMissionMapR = 0x8D6C;
+        //public const uint PartyQuestSomethingR = 0x8EB1; // Sent to client
+        //public const uint PartyQuestSomethingR = 0x8EB4; // Sent to client
+        public const uint ShadowMissionList = 0x8EBF;
+        public const uint ShadowMissionListR = 0x8EC0;
+        public const uint ShadowMissionParties = 0x8EC1;
+        public const uint ShadowMissionPartiesR = 0x8EC2;
+        public const uint ShadowMissionAccept = 0x8EC3;
+        public const uint ShadowMissionAcceptR = 0x8EC4;
+        public const uint ShadowMissionExit = 0xA90D;
+        public const uint ShadowMissionExitR = 0xA90E;
+        public const uint ShadowMissionRegionR = 0xA97E;
 
 		// Messenger Server
 		// ------------------------------------------------------------------
